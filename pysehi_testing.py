@@ -31,21 +31,18 @@ folder_helios = r"G:\My Drive\Data\James\Raw\HOPG\220926\AB2"
 folder_AC = r"G:\My Drive\Data\James\Raw\Pristine\Powder\NMC\622\BSAF\221006_1\BG1"
 folder_processed = r"G:\My Drive\Data\James\Processed\Graphene\220824\Gr1\AC1_AC"
 
-def process_files(path_to_files, AC:bool=True):
+def process_files(path_to_files, AC:bool=True, condition_true:list=None, condition_false:list=None):
     if 'Raw' in path_to_files:
-        data_files = list_files(path_to_files)
+        data_files = list_files(path_to_files, condition_true, condition_false)
         for name in data_files:
-            if os.path.exists(name.replace('Raw','Processed')) is False:
-                root = data_files[name]['Raw_path']
-                print(rf'loading.........{root}')
-                data_files[name]['Processed_path'] = path_to_files.replace('Raw','Processed')
-                if AC is True:
-                    if '_R' not in root:
-                        data(root).save_data()
-                else:
-                    data(root, AC=False).save_data()
-                data_files[name]['stack_meta'] = data(root).stack_meta
-        print(rf'{name}.........processed!')
+            root = data_files[name]['Raw_path']
+            if os.path.exists(root.replace('Raw','Processed')) is False:
+                if '_R' not in root:
+                    print(rf'loading.........{root}')
+                    data_files[name]['Processed_path'] = path_to_files.replace('Raw','Processed')
+                    data(root, AC=AC).save_data()
+                    data_files[name]['stack_meta'] = data(root).stack_meta
+                    print(rf'{root}.........processed!')
         return data_files
     else:
         print(r'already processed files associated with Raw_path')

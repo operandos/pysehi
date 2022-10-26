@@ -18,10 +18,10 @@ import matplotlib.cm as comap
 import matplotlib.colors as colors
 import smooth
 
-def gmm_seg(img, max_comp=10, n_components=None):
+def gmm_seg(img, max_comp=10, n_components=None, plot:bool=False):
+    img_uf = smooth.uniform(img)
+    img1=img_uf.reshape((img.size,1))
     if n_components is None:
-        img_uf = smooth.uniform(img)
-        img1=img_uf.reshape((img.size,1))
         bics = []
         for i in range(max_comp): # test the AIC/BIC metric between 1 and 10 components
             gmm = GMM(n_components = i+1, covariance_type = 'full')
@@ -29,7 +29,9 @@ def gmm_seg(img, max_comp=10, n_components=None):
             bic = gmm.bic(img1)
             bics.append(bic)
         n_components = opt_comp_bics(bics)
-    
+    if n_components is not None:
+        gmm = GMM(n_components = n_components, covariance_type = 'full')
+        labels = gmm.fit(img1).predict(img1)
     n_x = np.arange(np.min(img),np.max(img)+1,1)
 
     gmm_model = GMM(n_components).fit(img1)
@@ -54,14 +56,18 @@ def gmm_seg(img, max_comp=10, n_components=None):
     
     orig = img.shape
     segmented = gmm_labels.reshape(orig[0],orig[1])
-    n = np.max(segmented)+1
     
-    from_list = colors.LinearSegmentedColormap.from_list
-    cm = from_list(None, plt.cm.Set1(range(0,n)), n)
-    plt.imshow(segmented, cmap=cm)
-    plt.clim(-0.5, n-0.5)
-    cb = plt.colorbar(ticks=range(0,n), label='Group')
-    cb.ax.tick_params(length=0)
+    if plot:
+        n = np.max(segmented)+1
+        from_list = colors.LinearSegmentedColormap.from_list
+        cm = from_list(None, plt.cm.Set1(range(0,n)), n)
+        plt.imshow(segmented, cmap=cm)
+        plt.clim(-0.5, n-0.5)
+        cb = plt.colorbar(ticks=range(0,n), label='Group')
+        cb.ax.tick_params(length=0)
+    plt.show()
+    
+    return segmented
 
 def opt_comp_bics(bics):
     bics_change = max(bics)-min(bics)
