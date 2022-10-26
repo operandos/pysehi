@@ -16,6 +16,7 @@ from matplotlib_scalebar.scalebar import ScaleBar
 from matplotlib.path import Path
 import matplotlib.patches as patches
 import matplotlib.cm as cm
+from matplotlib import colors
 from cv2 import matchTemplate as match_template
 from cv2 import minMaxLoc as min_max_loc
 from cv2 import TM_CCOEFF_NORMED
@@ -31,22 +32,25 @@ folder_AC = r"G:\My Drive\Data\James\Raw\Pristine\Powder\NMC\622\BSAF\221006_1\B
 folder_processed = r"G:\My Drive\Data\James\Processed\Graphene\220824\Gr1\AC1_AC"
 
 def process_files(path_to_files, AC:bool=True):
-    if 'Raw' in path_to_files and os.path.exists(path_to_files.replace('Raw','Processed')) is False:
+    if 'Raw' in path_to_files:
         data_files = list_files(path_to_files)
         for name in data_files:
-            root = data_files[name]['Raw_path']
-            data_files[name]['Processed_path'] = path_to_files.replace('Raw','Processed')
-            if AC is True:
-                if '_R' not in root:
-                    data(root).save_data()
-            else:
-                data(root, AC=False).save_data()
-            data_files[name]['stack_meta'] = data(root).stack_meta()
+            if os.path.exists(name.replace('Raw','Processed')) is False:
+                root = data_files[name]['Raw_path']
+                print(rf'loading.........{root}')
+                data_files[name]['Processed_path'] = path_to_files.replace('Raw','Processed')
+                if AC is True:
+                    if '_R' not in root:
+                        data(root).save_data()
+                else:
+                    data(root, AC=False).save_data()
+                data_files[name]['stack_meta'] = data(root).stack_meta
+        print(rf'{name}.........processed!')
         return data_files
     else:
         print(r'already processed files associated with Raw_path')
 
-def list_files(path_to_files, load_data=False):
+def list_files(path_to_files, condition_true:list=None, condition_false:list=None, load_data=False):
     """
     List raw files for processing or processed files for analysis
     Requires data file structure to be located using the scheme ...\Raw\Material\YYMMDD\Subclass\folder
@@ -55,6 +59,8 @@ def list_files(path_to_files, load_data=False):
     ----------
     path_to_files : str
         path to raw or processed files from a certain date
+    conditions : list
+        list of strings that must be included in root for root to be added to list of files
     load_data : bool
         if True, will add asociated .tif stack to dict
 
@@ -66,31 +72,40 @@ def list_files(path_to_files, load_data=False):
     """
     data_files={}
     for root, _, file_list in os.walk(path_to_files):
-            if len(file_list) > 0:
-                name = os.path.split(root)[1]
-                date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
-                if 'Raw' in path_to_files:
-                    if any('Log.csv' in file for file in file_list) or any('TLD_Mirror' in file for file in file_list):
-                        material = root.split(rf'\{date}')[0].split('Raw\\')[1]
-                        data_files[name]={}
-                        data_files[name]['Date'] = date
-                        data_files[name]['Material'] = material
-                        data_files[name]['Raw_path'] = root
-                if 'Processed' in path_to_files:
-                    if any('stack.tif' in file for file in file_list):
-                        material = root.split(rf'\{date}')[0].split('Processed\\')[1]
-                        data_files[name]={}
-                        data_files[name]['Date'] = date
-                        data_files[name]['Material'] = material
-                        data_files[name]['Processed_path'] = root
-                        if load_data:
-                            data_files[name]['data'] = data(data_files[name]['Processed_path'])
-                        else:
-                            data_files[name]['data'] = data(data_files[name]['Processed_path']).stack_meta
-                        if os.path.exists(root.replace('Processed','Raw')):
-                            data_files[name]['Raw_path'] = root.replace('Processed','Raw')
-                        else:
-                            data_files[name]['Raw_path'] = 'not known at this address'
+        if len(file_list) > 0:
+            if condition_true is not None:
+                if not any(c in root for c in condition_true):
+                    continue
+            if condition_false is not None:
+                if any(c in root for c in condition_false):
+                    continue
+            if 'Raw' in path_to_files:
+                if any('Log.csv' in file for file in file_list) or any('TLD_Mirror' in file for file in file_list):
+                    name = os.path.split(root)[1]
+                    date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
+                    material = root.split(rf'\{date}')[0].split('Raw\\')[1]
+                    data_files[rf'{date}_{name}']={}
+                    data_files[rf'{date}_{name}']['Date'] = date
+                    data_files[rf'{date}_{name}']['Material'] = material
+                    data_files[rf'{date}_{name}']['Raw_path'] = root
+            if 'Processed' in path_to_files:
+                if any('stack.tif' in file for file in file_list) and not any(f in root for f in ['Metadata','Colour-out']):
+                    name = os.path.split(root)[1]
+                    date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
+                    material = root.split(rf'\{date}')[0].split('Processed\\')[1]
+                    data_files[rf'{date}_{name}']={}
+                    data_files[rf'{date}_{name}']['Date'] = date
+                    data_files[rf'{date}_{name}']['Material'] = material
+                    data_files[rf'{date}_{name}']['Processed_path'] = root
+                    data_files[rf'{date}_{name}']['data']={}
+                    if load_data:
+                        data_files[rf'{date}_{name}']['data'] = data(data_files[rf'{date}_{name}']['Processed_path'])
+                    else:
+                        data_files[rf'{date}_{name}']['data']['stack_meta'] = data(data_files[rf'{date}_{name}']['Processed_path']).stack_meta
+                    if os.path.exists(root.replace('Processed','Raw')):
+                        data_files[rf'{date}_{name}']['Raw_path'] = root.replace('Processed','Raw')
+                    else:
+                        data_files[rf'{date}_{name}']['Raw_path'] = 'not known at this address'
     return data_files                      
 
 def load(folder, factor_helios=-0.39866666666666667, factor_nova=1/2.84, corr=6, AC=True): #add roi input here
@@ -179,10 +194,14 @@ def load(folder, factor_helios=-0.39866666666666667, factor_nova=1/2.84, corr=6,
                 stack_meta[f'img{i}']['TLD'][analyser] = ana_voltage[i-1]
         x_max, y_max = np.ceil(np.max(shift_list_1,axis=0))
         x_min, y_min = np.floor(np.min(shift_list_1,axis=0))
+        if y_min > 0:
+            y_min = 0
+        if x_min > 0:
+            x_min = 0
         stack = np.array(imgs)[:,int(0-y_min):int(y-y_max),int(0-x_min):int(x-x_max)]
         stack_meta[f'img{len(stack)}']['Processing']['temp_match'] = {}
-        stack_meta[f'img{len(stack)}']['Processing']['temp_match']['ref_img'] = ref_img[0:y,0:x]
-        stack_meta[f'img{len(stack)}']['Processing']['temp_match']['path'] = temp_path
+        stack_meta[f'img{len(stack)}']['Processing']['temp_match']['ref_img'] = ref_img[0:y,0:x].tolist()
+        stack_meta[f'img{len(stack)}']['Processing']['temp_match']['path'] = temp_path.tolist()
         stack_meta[f'img{len(stack)}']['Processing']['temp_match']['area'] = area
         if sys==True:
             eV = np.array(ana_voltage)*factor_helios+corr
@@ -222,6 +241,10 @@ def sys_type(metadata):
         sys = False
         analyser = 'Deflector'
     return sys, analyser
+
+def metadata_warning(stack_meta):
+    #do something about working distance, suction voltage, dwell, you know
+    return
 
 def template_crop(ref_img,y,x,hfw):
     w = hfw*1e6
@@ -338,6 +361,46 @@ def spec_dose(stack_meta):
         d_spec = 2*d_spec
     return d_spec
 
+def roi_masks(img, rois_data):
+    if len(img.shape) == 3:
+        img_r = img[-1,:,:]
+        z,y,x = img.shape
+    if len(img.shape) == 2:
+        img_r = img
+        y,x = img.shape
+    if '.zip' in rois_data:
+        rois = load_roi_file(rois_data)
+        for name in rois:
+            ygrid, xgrid = np.mgrid[:y, :x]
+            xypix = np.vstack((xgrid.ravel(), ygrid.ravel())).T
+            img_mask = np.ma.getmask(np.ma.array(img_r, mask=False))    # initialise the False 2D mask that roi_paths will be added to
+            for key in rois[name]['roi_path']:                          # loop through rois in composite roi
+                pth = Path(rois[name]['roi_path'][key], closed=False)       # construct a Path from the vertices
+                mask = pth.contains_points(xypix)                           # test which pixels fall within the path
+                mask = mask.reshape(y,x)                                    # reshape to the same size as the image
+                img_mask = np.ma.mask_or(img_mask,mask)                     # add the xycrop to the 2D mask
+            rois[name]['img_mask'] = img_mask                           # add img mask to rois dict
+    if type(rois_data) is dict:
+        rois=rois_data
+        for name in rois:
+            ygrid, xgrid = np.mgrid[:y, :x]
+            xypix = np.vstack((xgrid.ravel(), ygrid.ravel())).T
+            img_mask = np.ma.getmask(np.ma.array(img_r, mask=False))
+            pth = Path(rois[name]['roi_path'], closed=False)
+            mask = pth.contains_points(xypix)
+            mask = mask.reshape(y,x)
+            img_mask = np.ma.mask_or(img_mask,mask)
+            rois[name]['img_mask'] = img_mask
+    if '.npy' in rois_data:
+        rois = {}
+        masks = np.load(rois_data)
+        i=0
+        while i <= masks.max():
+            rois[i] = {}
+            rois[i]['img_mask'] = np.where(masks==i,True,False)
+            i+=1
+    return rois
+
 def load_roi_file(path_to_roi_file):
     """
     Gets the xy points to draw a roi from the imageJ .roi file to a python dictionary
@@ -353,51 +416,31 @@ def load_roi_file(path_to_roi_file):
         dict of rois with properties such as type, xy_crop
 
     """
-    if '.zip' in path_to_roi_file:
-        rois=read_roi.read_roi_zip(path_to_roi_file)
-    if '.roi' in path_to_roi_file:
-        rois=read_roi.read_roi_file(path_to_roi_file)
-    for name in rois:
+    #if '.zip' in path_to_roi_file:
+    r=read_roi.read_roi_zip(path_to_roi_file)
+    #if '.roi' in path_to_roi_file:
+    #    r=read_roi.read_roi_file(path_to_roi_file)
+    for name in r:
         xy_crop = {}
-        if rois[name]['type'] == 'rectangle':
-            x1 = rois[name]['left']
-            x2 = x1 + rois[name]['width']
-            y1 = rois[name]['top']
-            y2 = y1 + rois[name]['height']
+        if r[name]['type'] == 'rectangle':
+            x1 = r[name]['left']
+            x2 = x1 + r[name]['width']
+            y1 = r[name]['top']
+            y2 = y1 + r[name]['height']
             xc = np.array([x1,x2,x2,x1])
             yc = np.array([y1,y1,y2,y2])
             xy_crop[0] = np.vstack((xc, yc)).T
-        if rois[name]['type'] == 'composite':
-            for i,path in enumerate(rois[name]['paths']):
-                xc = np.array(rois[name]['paths'][i])[:,0]
-                yc = np.array(rois[name]['paths'][i])[:,1]
+        if r[name]['type'] == 'composite':
+            for i,path in enumerate(r[name]['paths']):
+                xc = np.array(r[name]['paths'][i])[:,0]
+                yc = np.array(r[name]['paths'][i])[:,1]
                 xy_crop[i] = np.vstack((xc, yc)).T
-        if rois[name]['type'] == 'freehand':
-            xc = np.array(rois[name]['x'])
-            yc = np.array(rois[name]['y'])
+        if r[name]['type'] == 'freehand':
+            xc = np.array(r[name]['x'])
+            yc = np.array(r[name]['y'])
             xy_crop[0] = np.vstack((xc, yc)).T
-        rois[name]['roi_path'] = xy_crop
-    return rois
-
-def rois_data(data, path_to_roi_file):
-    rois = load_roi_file(path_to_roi_file)
-    if len(data.shape) == 3:
-        img = data[-1,:,:]
-        z,y,x = data.shape
-    if len(data.shape) == 2:
-        img = data
-        y,x = data.shape
-    for name in rois:
-        ygrid, xgrid = np.mgrid[:y, :x]
-        xypix = np.vstack((xgrid.ravel(), ygrid.ravel())).T
-        img_mask = np.ma.getmask(np.ma.array(img, mask=False))    # initialise the False 2D mask that roi_paths will be added to
-        for key in rois[name]['roi_path']:                          # loop through rois in composite roi
-            pth = Path(rois[name]['roi_path'][key], closed=False)       # construct a Path from the vertices
-            mask = pth.contains_points(xypix)                           # test which pixels fall within the path
-            mask = mask.reshape(y,x)                                    # reshape to the same size as the image
-            img_mask = np.ma.mask_or(img_mask,mask)                     # add the xycrop to the 2D mask
-        rois[name]['img_mask'] = img_mask                           # add img mask to rois dict
-    return rois
+        r[name]['roi_path'] = xy_crop
+    return r
 
 class data:
     factor = -0.39866666666666667
@@ -481,7 +524,14 @@ class data:
                 else:
                     y0 = py
                 stack_AC_crop = stack_AC[:,y0:int(yi+ty),:]
-                
+            if xicrop == 'Equal':
+                if tx>0:
+                    stack_AC_crop = stack_AC[:,:,:]
+                if tx<0 or tx==0:
+                    x0=0
+                    if abs(tx)<px:
+                        x0 = int(px)
+                    stack_AC_crop = stack_AC[:,:,:]
             if xicrop == False:
                 if tx>0:
                     stack_AC_crop = stack_AC_crop[:,:,int(tx+px):xi]
@@ -506,16 +556,21 @@ class data:
             self.stack, self.stack_meta, self.eV, self.dtype_info, self.name = load(folder)
             self.shape = self.stack.shape
     def spec(self, rois = None):
-        spec = np.gradient(zpro(self.stack))
         if rois is not None:
             if type(rois) is not dict:
-                rois = rois_data(self.stack, rois)
-            for name in rois:
-                stack_mask = np.array(rois[name]['img_mask']*self.shape[0])
+                r = roi_masks(self.stack, rois)
+            if 'img_mask' not in rois[list(rois.keys())[0]]:
+                r = roi_masks(self.stack, rois)
+            else:
+                r = rois
+            for name in r:
+                stack_mask = np.array([r[name]['img_mask']]*self.shape[0])
                 stack_masked = np.ma.masked_array(self.stack, ~stack_mask)
-                rois[name]['spec'] = np.gradient(zpro(stack_masked))
-            return rois
-        return spec
+                r[name]['spec'] = np.gradient(zpro(stack_masked))
+            return r
+        else:
+            spec = np.gradient(zpro(self.stack))
+            return spec
     def spec_dose(self):
         return spec_dose(self.stack_meta)
     def plot_template_roi(self):
@@ -554,36 +609,40 @@ class data:
             plt.axis('off')
         if plot is True:
             plt.show()
-    def plot_spec(self, rois=None):
+    def plot_spec(self, rois=None, plot=True):
+        if rois is None:
+            plt.plot(self.eV, data.spec(self))
+            plot_axes()
+            if plot:
+                plt.show()
         if rois is not None:
             if type(rois) is not dict:
-                rois = rois_data(self.stack, rois)
-            color = cm.rainbow(np.linspace(0,1,len(rois)))
-            for name,c in zip(rois,color):
-                if not 'spec' in rois[name]:
-                    rois = data.spec(self,rois)
-                plt.plot(self.eV, data.spec(self, rois), c=c)
-            plot_axes()
-            plt.show()
-            data.plot_img(plot=False)
-            if len(rois)>6:
-                ncol = 6
-                nrow = len(rois)/6
-                bbox_to_anchor=(0.5,(nrow*-0.1))
+                r = roi_masks(self.stack, rois)
+            if 'img_mask' not in rois[list(rois.keys())[0]]:
+                r = roi_masks(self.stack, rois)
             else:
-                ncol = len(rois)
-                bbox_to_anchor=(0.5,-0.11)
-            for name,c in zip(rois,color):
-                for i in rois[name]['roi_path']:
-                    patch = patches.Polygon(rois[name]['roi_path'][i],closed=True, fill=False, edgecolor=c, linewidth=0.5)#, label=name)
-                    plt.add_patch(patch)
-            plt.legend(labels=rois.keys(), bbox_to_anchor=bbox_to_anchor, loc='lower center', ncol=ncol)
-            bbox_inches = 0
-            #plt.savefig(rf'{folder}\{rName}_results\roi.png', dpi=400)
-            plt.show()
-        plt.plot(self.eV, data.spec(self))
-        plot_axes()
-        plt.show()
+                r = rois
+            color = cm.rainbow(np.linspace(0,1,len(r)))
+            masks=np.empty(self.shape[1:3])
+            for i, (name,c) in enumerate(zip(r,color)):
+                if not 'spec' in r[name]:
+                    r[name]['spec'] = data.spec(self, rois)[name]['spec']
+                plt.plot(self.eV, data.spec(self, rois)[name]['spec'], c=c, label=name)
+                img_mask = np.where(r[name]['img_mask']==True,i+1,0)
+                masks = masks+img_mask
+            masks = masks-1
+            norm = colors.Normalize(vmin=0, vmax=len(r))
+            cmap = plt.get_cmap('rainbow')
+            masks_n = norm(masks)
+            rgba = cmap(masks_n)
+            rgba[masks==-1,:] = [1,1,1,1]
+            plot_axes()
+            plt.legend()
+            if plot:
+                plt.show()
+                #n=len(r)+1
+                plt.imshow(rgba)
+                
     def plot_zpro(self):
         plt.plot(self.eV, data.zpro(self))
         plot_axes()
