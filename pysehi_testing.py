@@ -365,7 +365,7 @@ def roi_masks(img, rois_data):
     if len(img.shape) == 2:
         img_r = img
         y,x = img.shape
-    if '.zip' in rois_data:
+    if '.zip' in rois_data or '.roi' in rois_data:
         rois = load_roi_file(rois_data)
         for name in rois:
             ygrid, xgrid = np.mgrid[:y, :x]
@@ -413,10 +413,10 @@ def load_roi_file(path_to_roi_file):
         dict of rois with properties such as type, xy_crop
 
     """
-    #if '.zip' in path_to_roi_file:
-    r=read_roi.read_roi_zip(path_to_roi_file)
-    #if '.roi' in path_to_roi_file:
-    #    r=read_roi.read_roi_file(path_to_roi_file)
+    if '.zip' in path_to_roi_file:
+        r=read_roi.read_roi_zip(path_to_roi_file)
+    if '.roi' in path_to_roi_file:
+        r=read_roi.read_roi_file(path_to_roi_file)
     for name in r:
         xy_crop = {}
         if r[name]['type'] == 'rectangle':
