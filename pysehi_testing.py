@@ -111,6 +111,8 @@ def load(folder, factor_helios=-0.39866666666666667, factor_nova=1/2.84, corr=6,
         processed = True
         stacks = glob.glob(rf'{folder}\*stack*.tif')
         for stack_file in stacks:
+            if 'seg' in stack_file:
+                continue
             if '_AC' in stack_file:
                 stack = tf.imread(stack_file)
             if 'aligned' in stack_file:
@@ -282,8 +284,8 @@ def align_img_pcc(ref_img, mov_img, crop_y=None, crop_x=None, upsample_factor = 
 def conversion(stack_meta, factor, corr):
     MV = []
     for page in stack_meta:
-        stack_meta[page]['TLD']['Mirror']
-    eV = (MV*factor)+corr
+        MV.append(stack_meta[page]['TLD']['Mirror'])
+    eV = (np.array(MV)*factor)+corr
     return eV
 
 def plot_axes(norm=False):

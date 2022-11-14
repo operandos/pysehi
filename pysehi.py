@@ -36,7 +36,7 @@ def process_files(path_to_files, AC:bool=True, condition_true:list=None, conditi
                     print(rf'loading.........{root}')
                     data_files[name]['Processed_path'] = path_to_files.replace('Raw','Processed')
                     data(root, AC=AC).save_data()
-                    data_files[name]['stack_meta'] = data(root).stack_meta
+                    data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
                     print(rf'{root}.........processed!')
         return data_files
     else:

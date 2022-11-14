@@ -19,6 +19,8 @@ import matplotlib.colors as colors
 import smooth
 
 def gmm_seg(img, max_comp=10, n_components=None, plot:bool=False):
+    if type(img) is str and '.tif' in img:
+        img = tf.imread(img)
     img_uf = smooth.uniform(img)
     img1=img_uf.reshape((img.size,1))
     if n_components is None:
