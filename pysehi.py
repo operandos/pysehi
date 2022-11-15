@@ -277,8 +277,8 @@ def align_img_pcc(ref_img, mov_img, crop_y=None, crop_x=None, upsample_factor = 
 def conversion(stack_meta, factor, corr):
     MV = []
     for page in stack_meta:
-        stack_meta[page]['TLD']['Mirror']
-    eV = (MV*factor)+corr
+        MV.append(stack_meta[page]['TLD']['Mirror'])
+    eV = (np.array(MV)*factor)+corr
     return eV
 
 def plot_axes(norm=False):
