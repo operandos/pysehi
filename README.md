@@ -1,2 +1,2 @@
 # pysehi
- Tools for SEHI and SEM-derived SE spectroscopy
+ Tools for Secondary Electron Hyperspectral Imaging (SEHI) and Scanning Electron Microscope (SEM) derived Secondary Electron (SE) spectroscopy
