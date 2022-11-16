@@ -42,17 +42,21 @@ def process_files(path_to_files, AC:bool=True, condition_true:list=None, conditi
     else:
         print(r'already processed files associated with Raw_path')
 
-def list_files(path_to_files, condition_true:list=None, condition_false:list=None, load_data=False):
+def list_files(path_to_files, date:int=None, condition_true:list=None, condition_false:list=None, load_data=False):
     """
     List raw files for processing or processed files for analysis
     Requires data file structure to be located using the scheme ...\Raw\Material\YYMMDD\Subclass\folder
 
     Parameters
     ----------
+    date : int
+        date in YYMMDD format
     path_to_files : str
         path to raw or processed files from a certain date
-    conditions : list
+    condition_true : list
         list of strings that must be included in root for root to be added to list of files
+    condition_false : list
+        list of strings that must not be included in root for root to be added to list of files
     load_data : bool
         if True, will add asociated .tif stack to dict
 
@@ -65,6 +69,9 @@ def list_files(path_to_files, condition_true:list=None, condition_false:list=Non
     data_files={}
     for root, _, file_list in os.walk(path_to_files):
         if len(file_list) > 0:
+            if date is not None:
+                if not str(date) in root:
+                    continue
             if condition_true is not None:
                 if not any(c in root for c in condition_true):
                     continue
