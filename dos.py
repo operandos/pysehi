@@ -10,7 +10,7 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 
-def load_dos_npy(compounds:list or str,xlim:float=6, plot:bool=False, path_to_dos_lib=r"G:\My Drive\Data\Simulation\Materials project\Data\220319"):
+def load_dos_npy(compounds:list or str,xlim:float=6, plot:bool=False, path_to_dos_lib:str):
     if type(compounds) is str:
         compounds = [compounds]
     dos={}
