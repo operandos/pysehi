@@ -26,23 +26,26 @@ from skimage import img_as_ubyte
 from skimage import img_as_float
 import read_roi
 
-def process_files(path_to_files, AC:bool=True, condition_true:list=None, condition_false:list=None):
-    if 'Raw' in path_to_files:
-        data_files = list_files(path_to_files, condition_true, condition_false)
-        for name in data_files:
-            root = data_files[name]['Raw_path']
-            if os.path.exists(root.replace('Raw','Processed')) is False:
-                if '_R' not in root:
-                    print(rf'loading.........{root}')
-                    data_files[name]['Processed_path'] = path_to_files.replace('Raw','Processed')
-                    data(root, AC=AC).save_data()
-                    data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
-                    print(rf'{root}.........processed!')
-        return data_files
+def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None,register=True):
+    if type(files) is str:
+        if 'Raw' in files:
+            data_files = list_files(files, condition_true, condition_false)
+    if type(files) is dict:
+        data_files = files
+    for name in data_files:
+        root = data_files[name]['Raw_path']
+        if os.path.exists(root.replace('Raw','Processed')) is False:
+            if '_R' not in root:
+                print(rf'loading.........{root}')
+                data_files[name]['Processed_path'] = root.replace('Raw','Processed')
+                data(root, AC=AC, reg=register).save_data()
+                data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
+                print(rf'{root}.........processed!')
+        #return data_files
     else:
         print(r'already processed files associated with Raw_path')
 
-def list_files(path_to_files, date:int=None, condition_true:list=None, condition_false:list=None, load_data=False):
+def list_files(path_to_files, date:int=None, condition_true:list=None, condition_false:list=None, load_data=False, custom_name=None):
     """
     List raw files for processing or processed files for analysis
     Requires data file structure to be located using the scheme ...\Raw\Material\YYMMDD\Subclass\folder
@@ -79,7 +82,11 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
                 if any(c in root for c in condition_false):
                     continue
             if 'Raw' in path_to_files:
-                if any('Log.csv' in file for file in file_list) or any('TLD_Mirror' in file for file in file_list):
+                if custom_name is not None:
+                    file_str = custom_name
+                else:
+                    file_str = 'TLD_Mirror'
+                if any('Log.csv' in file for file in file_list) or any(file_str in file for file in file_list):
                     name = os.path.split(root)[1]
                     date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
                     material = root.split(rf'\{date}')[0].split('Raw\\')[1]
@@ -107,7 +114,7 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
                         data_files[rf'{date}_{name}']['Raw_path'] = 'not known at this address'
     return data_files                      
 
-def load(folder, factor_helios=-0.39866666666666667, factor_nova=1/2.84, corr=6, AC=True): #add roi input here
+def load(folder, factor_helios=-0.39866666666666667, factor_nova=1/2.84, corr=6, AC=True, register=True): #add roi input here
     name = os.path.split(folder)[1]
     if 'Processed' in folder and os.path.exists(rf'{folder}\Metadata'):
         processed = True
@@ -179,29 +186,35 @@ def load(folder, factor_helios=-0.39866666666666667, factor_nova=1/2.84, corr=6,
             i+=1 # for legacy reasons (img saved from TLD_Mirror1)
             img, metadata = load_single_file(file)
             stack_meta[f'img{i}'] = metadata
-            reg_img, shift_y, shift_x = align_img_template(ref_img,img,template,y,x,temp_path[0,0],temp_path[0,1])
-            imgs.append(np.array(reg_img*dtype_info.max,dtype=img.dtype))
-            shift_list_1.append([shift_x,shift_y])
             stack_meta[f'img{i}']['Processing'] = {}
             stack_meta[f'img{i}']['Processing']['file'] = file
-            stack_meta[f'img{i}']['Processing']['transformation'] = {}
-            stack_meta[f'img{i}']['Processing']['transformation']['x'] = float(shift_x)
-            stack_meta[f'img{i}']['Processing']['transformation']['y'] = float(shift_y)
+            if register is True:
+                reg_img, shift_y, shift_x = align_img_template(ref_img,img,template,y,x,temp_path[0,0],temp_path[0,1])
+                imgs.append(np.array(reg_img*dtype_info.max,dtype=img.dtype))
+                shift_list_1.append([shift_x,shift_y])
+                stack_meta[f'img{i}']['Processing']['transformation'] = {}
+                stack_meta[f'img{i}']['Processing']['transformation']['x'] = float(shift_x)
+                stack_meta[f'img{i}']['Processing']['transformation']['y'] = float(shift_y)
+            if register is False:
+                imgs.append(img)
             if sys == True:
                 ana_voltage.append(metadata['TLD'][analyser])
             if sys == False:
                 stack_meta[f'img{i}']['TLD'][analyser] = ana_voltage[i-1]
-        x_max, y_max = np.ceil(np.max(shift_list_1,axis=0))
-        x_min, y_min = np.floor(np.min(shift_list_1,axis=0))
-        if y_min > 0:
-            y_min = 0
-        if x_min > 0:
-            x_min = 0
-        stack = np.array(imgs)[:,int(0-y_min):int(y-y_max),int(0-x_min):int(x-x_max)]
-        stack_meta[f'img{len(stack)}']['Processing']['temp_match'] = {}
-        stack_meta[f'img{len(stack)}']['Processing']['temp_match']['ref_img'] = ref_img[0:y,0:x].tolist()
-        stack_meta[f'img{len(stack)}']['Processing']['temp_match']['path'] = temp_path.tolist()
-        stack_meta[f'img{len(stack)}']['Processing']['temp_match']['area'] = area
+        if register is True:
+            x_max, y_max = np.ceil(np.max(shift_list_1,axis=0))
+            x_min, y_min = np.floor(np.min(shift_list_1,axis=0))
+            if y_min > 0:
+                y_min = 0
+            if x_min > 0:
+                x_min = 0
+            stack = np.array(imgs)[:,int(0-y_min):int(y-y_max),int(0-x_min):int(x-x_max)]
+        if register is False:
+            stack = np.array(imgs)[:,:y,:x]
+        #stack_meta[f'img{len(stack)}']['Processing']['temp_match'] = {}
+        #stack_meta[f'img{len(stack)}']['Processing']['temp_match']['ref_img'] = ref_img[0:y,0:x].tolist()
+        #stack_meta[f'img{len(stack)}']['Processing']['temp_match']['path'] = temp_path.tolist()
+        #stack_meta[f'img{len(stack)}']['Processing']['temp_match']['area'] = area
         if sys==True:
             eV = np.array(ana_voltage)*factor_helios+corr
         if sys==False:
@@ -331,9 +344,9 @@ def zpro(stack):
 
 def spec_dose(stack_meta):
     """
-    Returns the electron dose per image expressed through an overall charge exposure, 
-    given by the product of the beam current I_0 and the total exposure time t_total per area A,
-    whereby typical quoted units are coulombs per metre squared [Cm^-2]
+    Returns the electron dose per field of view spectrum or SEHI data volume expressed through an overall 
+    charge exposure, given by the product of the beam current I_0 and the total exposure time t_total per
+    area A, where units are coulombs per metre squared [Cm^-2]
 
     Parameters
     ----------
@@ -361,6 +374,8 @@ def spec_dose(stack_meta):
     return d_spec
 
 def roi_masks(img, rois_data):
+    if type(img) is str:
+        img = tf.imread(img)
     if len(img.shape) == 3:
         img_r = img[-1,:,:]
         z,y,x = img.shape
@@ -444,11 +459,11 @@ def load_roi_file(path_to_roi_file):
 class data:
     factor = -0.39866666666666667
     corr = 6
-    def __init__(self, folder, AC=True):
+    def __init__(self, folder, AC=True, reg=True):
         if AC is True and 'Raw' in folder and os.path.exists(rf'{folder}_R'):
             self.folder = rf'{folder}_AC'
             stack_r_file = rf'{folder}_R'
-            stack,stack_meta,self.eV,self.dtype_info,name = load(folder)
+            stack,stack_meta,self.eV,self.dtype_info,name = load(folder,register=reg)
             stack_r, stack_meta_r, eV_r, dtype_info_r, name_r = load(stack_r_file)
             for page,page_r in zip(stack_meta,stack_meta_r):
                 stack_meta[page]['Processing']['angular_correction'] = 'True'
@@ -552,7 +567,7 @@ class data:
             self.shape = self.stack.shape
         else:
             self.folder = folder
-            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name = load(folder)
+            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name = load(folder,AC=False,register=reg)
             self.shape = self.stack.shape
     def spec(self, rois = None):
         if rois is not None:
