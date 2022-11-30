@@ -10,7 +10,7 @@ Create a pysehi environment and install the dependancies listed in pysehi.yml us
 ## Compatible data file structure
 pysehi functions will only work for data saved within a compatible file tree.  
 The file tree required by `process_data` is *...\Raw\material\YYMMDD\data_folder*. The processsed data is then saved to a *Processed* location that mirrors the *Raw* data file tree.  
-Functions `list_files` and `load` and the `data` class also require the folder (Processed or Raw) to be in the format *...\{Raw or Processed}\material\YYMMDD\data_folder*.  
+Functions `list_files` and `load` and the `data` class also require the folder (raw or processed) to be in the format *...\{Raw or Processed}\material\YYMMDD\data_folder*.  
 Any number of material sub-classes can be provided in the path eg. *...\Raw\material_class\material_subclass\material_condition\YYMMDD\data_folder*.  
 
 ## Outputs of `process_files`
