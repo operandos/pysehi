@@ -8,4 +8,6 @@
 Create a pysehi environment and install the dependancies listed in pysehi.yml using anaconda prompt and the [instructions](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file).
 
 ## Compatible data file structure
-pysehi function `process_files` will only work for data saved with a compatible file tree. The format required for raw data to be processed is *...\Raw\material\YYMMDD\data_folder*. The processsed data is then saved to a *Processed* location that mirrors the *Raw* data file tree. Any number of material sub-classes can be provided in the *Raw* path eg. *...\Raw\material_class\materials_subclass\material_condition\YYMMDD\data_folder*.
+pysehi function `process_files` will only work for data saved with a compatible file tree.
+The format required for raw data to be processed is *...\Raw\material\YYMMDD\data_folder*. The processsed data is then saved to a *Processed* location that mirrors the *Raw* data file tree.
+Any number of material sub-classes can be provided in the *Raw* path eg. *...\Raw\material_class\materials_subclass\material_condition\YYMMDD\data_folder*.
