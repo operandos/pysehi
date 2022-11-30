@@ -13,7 +13,7 @@ The format required for raw data to be processed is *...\Raw\material\YYMMDD\dat
 Any number of material sub-classes can be provided in the *Raw* path eg. *...\Raw\material_class\materials_subclass\material_condition\YYMMDD\data_folder*.
 
 ## Outputs of `process_files`
-**{folder}_stack.tif** - Registered and cropped image stack. The SEHI data volume. Scale and slice label metadata compatible with FIJI (ImageJ).  
-**{folder}_avg_img.tif** - Average image of SEHI data volume along energy axis. Scale metadata compatible with FIJI (ImageJ).  
-**{folder}_avg_img_scaled.png** - Average image with scalebar saved at 400 dpi.  
-**{folder}_stack_meta.json** - Dictionary structure of FEI/ThermoScientific image metadata for each slice in the SEHI data volume.  
+**stack.tif** - Registered and cropped image stack. The SEHI data volume. Scale and slice label metadata compatible with FIJI (ImageJ).  
+**avg_img.tif** - Average image of SEHI data volume along energy axis. Scale metadata compatible with FIJI (ImageJ).  
+**avg_img_scaled.png** - Average image with scalebar saved at 400 dpi.  
+**stack_meta.json** - Dictionary structure of FEI/ThermoScientific image metadata for each slice in the SEHI data volume.  
