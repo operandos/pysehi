@@ -689,4 +689,4 @@ class data:
             with open(rf'{save_path}\Metadata\{self.name}_stack_meta_r.json', 'w') as f:
                 json.dump(self.stack_meta_r, f)
             f.close()
-        plot_scalebar(data.img_avg(self), stack_meta=self.stack_meta, save_path=rf'{save_path}\{self.name}_avg_img_scaled.tif')
+        plot_scalebar(data.img_avg(self), stack_meta=self.stack_meta, save_path=rf'{save_path}\{self.name}_avg_img_scaled.png')
