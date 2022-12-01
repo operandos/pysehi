@@ -579,6 +579,9 @@ class data:
             self.folder = folder
             self.stack, self.stack_meta, self.eV, self.dtype_info, self.name = load(folder,AC=False,register=reg)
             self.shape = self.stack.shape
+    def rows(self, xmin=0, xmax=7):
+        rows = np.where((self.eV>=0)&(self.eV<=7))[0]
+        return rows
     def spec(self, rois = None):
         if rois is not None:
             if type(rois) is not dict:
