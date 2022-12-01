@@ -94,7 +94,7 @@ def compute_contour(thresh, size_pix=0):
     :return: contours of the particles
     """
     # Label connected regions of the input image.
-    # Two pixels are connected when they are neighbors and have the same value.
+    # Two pixels are connected when they are neighbors and have the same value
     # background pixels are labeled as 0
     labels = measure.label(thresh, background=0)
 
