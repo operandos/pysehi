@@ -25,6 +25,7 @@ from skimage.registration import phase_cross_correlation as pcc
 from skimage import img_as_ubyte
 from skimage import img_as_float
 import read_roi
+import output
 
 def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None,register=True):
     if type(files) is str:
@@ -44,6 +45,8 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
         #return data_files
     else:
         print(r'already processed files associated with Raw_path')
+    data_pro_path = files.replace('Raw','Processed')
+    output.summary_excel(data_pro_path, condition_true, condition_false)
 
 def list_files(path_to_files, date:int=None, condition_true:list=None, condition_false:list=None, load_data=False, custom_name=None):
     """
@@ -238,7 +241,7 @@ def sys_type(metadata):
 
     Parameters
     ----------
-    metadata_page : python dict
+    metadata : python dict
         A single page of FEI/ThermoFisher image metadata
 
     Returns
@@ -460,6 +463,7 @@ class data:
     factor = -0.39866666666666667
     corr = 6
     def __init__(self, folder, AC=True, reg=True):
+        self.date = regex.search("(\d{6})|(\d*-[\d-]*\d)", folder).group(0)
         if AC is True and 'Raw' in folder and os.path.exists(rf'{folder}_R'):
             self.folder = rf'{folder}_AC'
             stack_r_file = rf'{folder}_R'
@@ -595,19 +599,22 @@ class data:
         plt.plot(temp_path[:,0],temp_path[:,1],c='r')
         plt.text(temp_path[0,0]+10,temp_path[0,1]-15,rf'template, area = {round(area,3)}',backgroundcolor=(1,1,1,0.3))
         plt.show()
-    def plot_reg_tforms(self):
-        for i,page in enumerate(self.stack_meta):
-            plt.plot(i,self.stack_meta[page]['Processing']['transformation']['x'], 'o', color='r')
-            plt.plot(i,self.stack_meta[page]['Processing']['transformation']['y'], 'o', color='b')
-        plt.legend(['x_shift','y_shift'])
+    def reg_tforms(self):
+        shifts={}
+        shift_x=[]
+        shift_y=[]
+        for page in self.stack_meta:
+            shift_x.append(self.stack_meta[page]['Processing']['transformation']['x'])
+            shift_y.append(self.stack_meta[page]['Processing']['transformation']['y'])
+        shifts[0] = np.array([shift_x,shift_y]).T
         if '_AC' in self.name and self.stack_meta['img1']['Processing']['angular_correction'] in self.stack_meta['img1']:
-            for i,page in enumerate(self.stack_meta):
-                plt.plot(i,self.stack_meta[page]['Processing']['transformation_r']['x'], 'ks', markerfacecolor='none', color='c')
-                plt.plot(i,self.stack_meta[page]['Processing']['transformation_r']['y'], 'ks', markerfacecolor='none', color='m')
-            plt.legend(['x_shift','y_shift','x_shift_r','y_shift_r'])
-        plt.xlabel('Slice no.')
-        plt.ylabel('Translation [pixel]')
-        plt.show()
+            shift_x_r=[]
+            shift_y_r=[]
+            for page in self.stack_meta:
+                shift_x_r.append(self.stack_meta[page]['Processing']['transformation_r']['x'])
+                shift_y_r.append(self.stack_meta[page]['Processing']['transformation_r']['y'])
+            shifts[1] = np.array(shift_x_r, shift_y_r)
+        return shifts
     def img_avg(self):
         img = np.array(np.mean(self.stack,axis=0),dtype=self.dtype_info.dtype)
         return img
@@ -656,12 +663,45 @@ class data:
                 plt.show()
                 #n=len(r)+1
                 plt.imshow(rgba)
-                
     def plot_zpro(self):
         plt.plot(self.eV, data.zpro(self))
         plot_axes()
         plt.show()
-    def save_data(self, save_path = None):
+    def plot_stack_meta(self, save_path=None):
+        sys, analyser = sys_type(self.stack_meta['img1'])
+        ChPressure=[]
+        V=[]
+        slices=[]
+        for i, page in enumerate(self.stack_meta):
+            V.append(self.stack_meta[page]['TLD'][analyser])
+            ChPressure.append(self.stack_meta[page]['Vacuum']['ChPressure'])
+            slices.append(i+1)
+        shifts = self.reg_tforms()
+        
+        fig, axs = plt.subplots(3, sharex=True, gridspec_kw={'height_ratios': [3, 2, 1]})
+        fig.suptitle(f"{self.date}_{self.name}")
+        ### plot reg_tforms ###
+        axs[0].plot(slices,shifts[0][:,0], 'o', color='r')
+        axs[0].plot(slices,shifts[0][:,1], 'o', color='b')
+        axs[0].legend(['x_shift','y_shift'])
+        if '_AC' in self.name and self.stack_meta['img1']['Processing']['angular_correction'] in self.stack_meta['img1']:
+            for i,page in enumerate(self.stack_meta):
+                axs[0].plot(slices,shifts[1][:,0], 'ks', markerfacecolor='none', color='c')
+                axs[0].plot(slices,shifts[1][:,1], 'ks', markerfacecolor='none', color='m')
+            axs[0].legend(['x_shift','y_shift','x_shift_r','y_shift_r'])
+        
+        axs[1].plot(slices, zpro(self.stack), 'k', label='Zpro.')
+        axs[1].set(ylabel='slice mean')
+        axs[1].legend()
+        axs[2].plot(slices,ChPressure, 'k-', label = 'ChPres.')
+        axs[2].set(xlabel='slice number', ylabel='Pa')
+        axs[2].legend()
+        if save_path is not None:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight',pad_inches=0)
+            plt.show()
+        if save_path is None:
+            plt.show()
+    def save_data(self, save_path=None):
         if save_path is None:
             if 'Raw' in self.folder:
                 save_path = self.folder.replace('Raw','Processed')
@@ -689,4 +729,5 @@ class data:
             with open(rf'{save_path}\Metadata\{self.name}_stack_meta_r.json', 'w') as f:
                 json.dump(self.stack_meta_r, f)
             f.close()
+        data.plot_stack_meta(self, save_path=rf'{save_path}\Metadata\{self.name}_stack_meta_plots.png')
         plot_scalebar(data.img_avg(self), stack_meta=self.stack_meta, save_path=rf'{save_path}\{self.name}_avg_img_scaled.png')
