@@ -378,7 +378,7 @@ def spec_dose(stack_meta):
         d_img = ((I_0*t_dwell*n_px*n_average)/A)/line_int
         d_img_list.append(d_img)
         d_spec = np.sum(d_img_list)
-    if stack_meta[page]['Processing']['angular_correction'] in stack_meta:
+    if 'angular_correction' in stack_meta[page]['Processing']:
         d_spec = 2*d_spec
     return d_spec
 
