@@ -29,8 +29,14 @@ import output
 
 def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None,register=True):
     if type(files) is str:
+        if regex.search("(\d{6})|(\d*-[\d-]*\d)", files) is None:
+            print(r"Date missing!    Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
+        if not 'Raw' in files:
+            print(r"Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
         if 'Raw' in files:
             data_files = list_files(files, condition_true, condition_false)
+        else:
+            print(r"Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
     if type(files) is dict:
         data_files = files
     for name in data_files:
