@@ -13,7 +13,7 @@ Create a pysehi environment and install the dependancies using [anaconda prompt]
 pysehi functions will only work for data saved within a compatible file tree.  
 The file tree required by `process_data` is *...\Raw\material\YYMMDD\data_folder*. The processsed data is then saved to a *Processed* location that mirrors the *Raw* data file tree.  
 Functions `list_files` and `load` and the `data` class also require the folder (raw or processed) to be in the format *...\{Raw or Processed}\material\\...\YYMMDD\\...\data_folder*.  
-Any number of 'material' sub-classes and sub-classes after 'YYMMDD' can be provided in the path eg. *...\Raw\material_class\material_subclass\material_condition\YYMMDD\experiment_1\data_folder*.  
+Any number of sub-classes can be provided after 'material' and 'YYMMDD' in the data folder path eg. *...\Raw\material_class\material_subclass\material_condition\YYMMDD\experiment_1\data_folder*.  
 
 ## Outputs of `process_files`
 **stack.tif** - Registered and cropped image stack. The SEHI data volume. Scale and slice label metadata compatible with FIJI (ImageJ).  
