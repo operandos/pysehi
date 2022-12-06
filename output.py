@@ -24,8 +24,11 @@ def summary_excel(path_to_files, date:int=None, condition_true:list=None, condit
         init_path = fg
         init_date = regex.search("(\d{6})|(\d*-[\d-]*\d)", fg).group(0)
         init_mat = fg.split(rf'\{init_date}')[0].split('Processed\\')[1].replace('\\','_')
-        init_exp = fg.split(f'{init_date}\\')[1].replace('\\','_')
-        workbook = xlsxwriter.Workbook(rf"{init_path}\{init_date}_{init_mat}_{init_exp}_specOut.xlsx")
+        if len(fg.split(f'{init_date}\\')) > 1:
+            init_exp = fg.split(f'{init_date}\\')[1].replace('\\','_')
+            workbook = xlsxwriter.Workbook(rf"{init_path}\{init_date}_{init_mat}_{init_exp}_specOut.xlsx")
+        else:
+            workbook = xlsxwriter.Workbook(rf"{init_path}\{init_date}_{init_mat}_specOut.xlsx")
         worksheetSpec = workbook.add_worksheet('FOV_spec')
         #worksheetMeta = workbook.add_worksheet('Metadata')
         

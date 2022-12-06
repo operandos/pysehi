@@ -48,9 +48,17 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
                 data(root, AC=AC, reg=register).save_data()
                 data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
                 print(rf'{root}.........processed!')
-        #return data_files
-    else:
-        print(r'already processed files associated with Raw_path')
+            if '_R' in root:
+                if AC is False:
+                    print(rf'loading.....................{root}')
+                    data_files[name]['Processed_path'] = root.replace('Raw','Processed')
+                    data(root, AC=AC, reg=register).save_data()
+                    data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
+                    print(rf'processed!..................{root}')
+                #if AC is True:
+                #    print(rf'AC is True, discounted......{root}')
+        else:
+            print(r'already processed files associated with Raw_path')
     data_pro_path = files.replace('Raw','Processed')
     output.summary_excel(data_pro_path, condition_true, condition_false)
 
@@ -568,8 +576,10 @@ class data:
                 if tx>px:
                     x0 = int(tx)
                 if tx>0:
+                    x0=0
                     stack_AC_crop = stack_AC_crop[:,:,x0:xi]
                 if tx<0 or tx==0:
+                    x0=0
                     stack_AC_crop = stack_AC_crop[:,:,x0:int(xi+tx)]
             self.stack, self.stack_meta = stack_AC_crop, stack_meta
             self.stack_meta_r = stack_meta_r
