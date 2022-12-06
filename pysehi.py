@@ -57,7 +57,7 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
                     print(rf'processed!..................{root}')
                 #if AC is True:
                 #    print(rf'AC is True, discounted......{root}')
-        else:
+        if os.path.exists(root.replace('Raw','Processed')) is True:
             print(r'already processed files associated with Raw_path')
     data_pro_path = files.replace('Raw','Processed')
     output.summary_excel(data_pro_path, condition_true, condition_false)
@@ -733,8 +733,8 @@ class data:
                    data=data.img_avg(self), dtype=self.dtype_info.dtype, photometric='minisblack', imagej=True, 
                    resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'unit': 'um', 'axes':'YX'})
         labels = []
-        for page in self.stack_meta:
-            labels.append(os.path.split(self.stack_meta[page]['Processing']['file'])[1])
+        for i,page in enumerate(self.stack_meta):
+            labels.append(rf'TLD_Mirror{i+1}_'+str(self.stack_meta[page]['TLD']['Mirror']))
         tf.imwrite(rf'{save_path}\{self.name}_stack.tif',
                    self.stack, dtype=self.dtype_info.dtype, photometric='minisblack', imagej=True,
                    resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'spacing':1, 'unit': 'um', 'axes':'ZYX', 'Labels':labels}) #make numpy array into multi page OME-TIF format (Bio - formats)
