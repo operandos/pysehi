@@ -10,7 +10,7 @@ Create a pysehi environment and install the dependancies using [anaconda prompt]
  - **pysehi_dependencies_spyder.yml** (with spyder IDE, for development) 
  In Anaconda Prompt run
   1) `activate sehi`
-  2) `cd *path_to_pysehi_folder*
+  2) `cd *path_to_pysehi_folder*`
   3) `jupyter notebook` to run scripts, or `spyder` for the development environment
 
 ## Compatible data file structure
