@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as comap
 import matplotlib.colors as colors
 import smooth
+import pysehi as ps
 
 def gmm_seg(img, max_comp=10, n_components=None, plot:bool=False):
     if type(img) is str and '.tif' in img:
@@ -134,3 +135,33 @@ def plot_res(segmented_8bit,res):
     for i in range(len(res)):
         plt.plot(res[i][:,0,0],res[i][:,0,1])
     plt.show()
+
+def cont_roi(img):
+    if type(img) is str:
+        img = tf.imread(img)
+    if len(img.shape) == 3:
+        z,y,x = img.shape
+    if len(img.shape) == 2:
+        y,x = img.shape
+    
+    cont_rois = {}
+    x1, x2 = (191/767)*x, (569/767)*x
+    y1, y2 = (140/496)*y, (351/496)*y
+    path = np.array([[x1,y1],[x2,y1],[x2,y2],[x1,y2]])
+    cont_rois['10_roi']={}
+    cont_rois['10_roi']['roi_path'] = path
+    
+    x1, x2 = (141/767)*x, (199/767)*x
+    y1, y2 = (104/496)*y, (386/496)*y
+    path = np.array([[x1,y1],[x2,y1],[x2,y2],[x1,y2]])
+    cont_rois['L_roi']={}
+    cont_rois['L_roi']['roi_path'] = path
+    
+    x1, x2 = (134/767)*x, (615/767)*x
+    y1, y2 = (95/496)*y, (406/496)*y
+    path = np.array([[x1,y1],[x2,y1],[x2,y2],[x1,y2]])
+    cont_rois['20_roi']={}
+    cont_rois['20_roi']['roi_path'] = path
+    
+    cont_rois = ps.roi_masks(img, cont_rois)
+    return cont_rois
