@@ -11,7 +11,7 @@ Create a pysehi environment and install the dependancies using [anaconda prompt]
 
 In Anaconda Prompt run:
   1) `activate sehi`
-  2) `cd *path_to_pysehi_folder*` note - if pysehi is in a different drive (eg. *G:*) to the default (eg *C:*), switch drive first by running `g:`
+  2) `cd *...\some_path\pysehi*` note - if pysehi is in a different drive (eg. *G:*) to the default (eg *C:*), switch drive first by running `g:`
   3) `jupyter notebook` to run scripts, **or** `spyder` for the development environment
 
 ## Compatible data file structure
