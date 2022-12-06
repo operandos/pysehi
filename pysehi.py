@@ -43,11 +43,11 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
         root = data_files[name]['Raw_path']
         if os.path.exists(root.replace('Raw','Processed')) is False:
             if '_R' not in root:
-                print(rf'loading.........{root}')
+                print(rf'loading.....................{root}')
                 data_files[name]['Processed_path'] = root.replace('Raw','Processed')
                 data(root, AC=AC, reg=register).save_data()
                 data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
-                print(rf'{root}.........processed!')
+                print(rf'processed!..................{root}')
             if '_R' in root:
                 if AC is False:
                     print(rf'loading.....................{root}')
