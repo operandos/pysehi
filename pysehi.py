@@ -54,7 +54,7 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
                     data_files[name]['Processed_path'] = root.replace('Raw','Processed')
                     data(root, AC=AC, reg=register).save_data()
                     data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
-                    print(rf'processed!..................{root}')
+                    print(rf"processed!..................{root.replace('Raw','Processed')}")
                 #if AC is True:
                 #    print(rf'AC is True, discounted......{root}')
         if os.path.exists(root.replace('Raw','Processed')) is True:
