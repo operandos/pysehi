@@ -479,10 +479,10 @@ class data:
     def __init__(self, folder, AC=True, reg=True):
         self.date = regex.search("(\d{6})|(\d*-[\d-]*\d)", folder).group(0)
         if AC is True and 'Raw' in folder and os.path.exists(rf'{folder}_R'):
-            self.folder = rf'{folder}_AC'
-            stack_r_file = rf'{folder}_R'
             stack,stack_meta,self.eV,self.dtype_info,name = load(folder,register=reg)
+            stack_r_file = rf'{folder}_R'
             stack_r, stack_meta_r, eV_r, dtype_info_r, name_r = load(stack_r_file)
+            self.folder = rf'{folder}_AC'
             for page,page_r in zip(stack_meta,stack_meta_r):
                 stack_meta[page]['Processing']['angular_correction'] = 'True'
                 stack_meta[page]['Processing']['transformation_r'] = stack_meta_r[page]['Processing']['transformation']
@@ -536,7 +536,7 @@ class data:
             stack_AC = stackCorr.astype(self.dtype_info.dtype)
             if yicrop == 'Equal':
                 if ty>0:
-                    stack_AC_crop = stack_AC[:,int(py+ty):int(yi+ty),:]
+                    stack_AC_crop = stack_AC[:,int(py+ty):int(yi-ty),:]
                 if ty<0 or ty==0:
                     y0=0
                     if abs(ty)<py:
@@ -558,12 +558,12 @@ class data:
                 stack_AC_crop = stack_AC[:,y0:int(yi+ty),:]
             if xicrop == 'Equal':
                 if tx>0:
-                    stack_AC_crop = stack_AC[:,:,:]
+                    stack_AC_crop = stack_AC_crop[:,:,:]
                 if tx<0 or tx==0:
                     x0=0
                     if abs(tx)<px:
                         x0 = int(px)
-                    stack_AC_crop = stack_AC[:,:,:]
+                    stack_AC_crop = stack_AC_crop[:,:,x0:int(xi+tx)]
             if xicrop == False:
                 if tx>0:
                     stack_AC_crop = stack_AC_crop[:,:,int(tx+px):xi]
@@ -579,7 +579,7 @@ class data:
                     x0=0
                     stack_AC_crop = stack_AC_crop[:,:,x0:xi]
                 if tx<0 or tx==0:
-                    x0=0
+                    x0=px
                     stack_AC_crop = stack_AC_crop[:,:,x0:int(xi+tx)]
             self.stack, self.stack_meta = stack_AC_crop, stack_meta
             self.stack_meta_r = stack_meta_r
@@ -626,13 +626,13 @@ class data:
             shift_x.append(self.stack_meta[page]['Processing']['transformation']['x'])
             shift_y.append(self.stack_meta[page]['Processing']['transformation']['y'])
         shifts[0] = np.array([shift_x,shift_y]).T
-        if '_AC' in self.name and self.stack_meta['img1']['Processing']['angular_correction'] in self.stack_meta['img1']:
+        if '_AC' in self.name and 'angular_correction' in self.stack_meta['img1']['Processing']:
             shift_x_r=[]
             shift_y_r=[]
             for page in self.stack_meta:
                 shift_x_r.append(self.stack_meta[page]['Processing']['transformation_r']['x'])
                 shift_y_r.append(self.stack_meta[page]['Processing']['transformation_r']['y'])
-            shifts[1] = np.array(shift_x_r, shift_y_r)
+            shifts[1] = np.array([shift_x_r, shift_y_r]).T
         return shifts
     def img_avg(self):
         img = np.array(np.mean(self.stack,axis=0),dtype=self.dtype_info.dtype)
@@ -703,7 +703,7 @@ class data:
         axs[0].plot(slices,shifts[0][:,0], 'o', color='r')
         axs[0].plot(slices,shifts[0][:,1], 'o', color='b')
         axs[0].legend(['x_shift','y_shift'])
-        if '_AC' in self.name and self.stack_meta['img1']['Processing']['angular_correction'] in self.stack_meta['img1']:
+        if '_AC' in self.name and 'angular_correction' in self.stack_meta['img1']['Processing']:
             for i,page in enumerate(self.stack_meta):
                 axs[0].plot(slices,shifts[1][:,0], 'ks', markerfacecolor='none', color='c')
                 axs[0].plot(slices,shifts[1][:,1], 'ks', markerfacecolor='none', color='m')
