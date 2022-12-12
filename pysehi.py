@@ -445,7 +445,7 @@ def roi_masks(img, rois_data):
             i+=1
     if type(rois_data) is np.ndarray:
         rois={}
-        ygrid, xgrid = np.mgrid[:y, :x]
+        ygrid, xgrid = np.mgrid[:y,:x]
         xypix = np.vstack((xgrid.ravel(), ygrid.ravel())).T
         img_mask = np.ma.getmask(np.ma.array(img_r, mask=False))
         pth = Path(rois_data, closed=False)
