@@ -10,9 +10,22 @@ import numpy as np
 import math
 from scipy.ndimage import gaussian_filter as gf
 import tifffile as tf
+import matplotlib.pyplot as plt
 
 test_img_path = r"G:\My Drive\Data\Collaboration\Processed\Loughborough\NMC\622\cathode\221209\BC1\BC1_avg_img.tif"
 img = ps.load_single_file(test_img_path)[0]
+
+def curtains_correction(img, radius=150, start_angle=177, end_angle=183):
+    amp = fft(img)
+    rois = segment_mask(img, radius, start_angle, end_angle)
+    mask = rois[0]['img_mask']
+    mask_app = np.ones((amp.shape))
+    mask_app = np.where(mask == False, mask_app,0)
+    mask_app = gf(mask_app,0.5)
+    amp_mask = amp*mask_app
+    res_amp_mask = np.abs(np.fft.ifft2(np.fft.ifftshift(amp_mask)))
+    plt.imshow(res_amp_mask,cmap='gray')
+    plt.show()
 
 def circle_mask(img, radius):
     result = np.zeros(img.shape,np.float64)
@@ -27,7 +40,7 @@ def circle_mask(img, radius):
 def degree2rad(degrees):
     return degrees*np.pi/180
 
-def segment_mask(img, radius=150, start_angle=177, end_angle=183):#, seg=False):
+def segment_mask(img, radius, start_angle, end_angle):
     cy,cx = np.array(img.shape)/2
     sta = degree2rad(start_angle)
     ea = degree2rad(end_angle)
@@ -37,9 +50,17 @@ def segment_mask(img, radius=150, start_angle=177, end_angle=183):#, seg=False):
     path = (x[0],y[0])
     for xc, yc in zip(x[1:], y[1:]):
         path = np.vstack((path,np.array([xc,yc])))
-    return path
-    #else: #disk sector
-    #    return np.vstack((path,np.array([cx,cy]))) #sector
+    sect = np.vstack((path,np.array([cx,cy]))) #sector
+    rois = ps.roi_masks(img, sect)
+    rois[0]['img_mask'] = np.ma.mask_or(rois[0]['img_mask'],np.flip(rois[0]['img_mask']))
+    return rois
+
+def fft(img, plot=False):
+    amp = (np.fft.fftshift(np.fft.fft2(img)))
+    return amp
+    if plot:
+        plt.imshow(np.log(np.abs(amp)))
+        plt.imshow()
 
 def relabel(data):
     if type(data) is str:
