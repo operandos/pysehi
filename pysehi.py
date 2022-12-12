@@ -45,7 +45,7 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
             if '_R' not in root:
                 print(rf'loading.....................{root}')
                 data_files[name]['Processed_path'] = root.replace('Raw','Processed')
-                data(root, AC=AC, reg=register).save_data()
+                data(root, AC=AC, reg=register).save_data(reg=register)
                 data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
                 print(rf'processed!..................{root}')
             if '_R' in root:
@@ -131,7 +131,7 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
                         data_files[rf'{date}_{name}']['Raw_path'] = 'not known at this address'
     return data_files                      
 
-def load(folder, factor_helios=-0.39866666666666667, factor_nova=1/2.84, corr=6, AC=True, register=True): #add roi input here
+def load(folder, AC=True, register=True, calib=None): #add roi input here
     name = os.path.split(folder)[1]
     if 'Processed' in folder and os.path.exists(rf'{folder}\Metadata'):
         processed = True
@@ -168,8 +168,13 @@ def load(folder, factor_helios=-0.39866666666666667, factor_nova=1/2.84, corr=6,
                 print('Warning, no Deflector in stack_meta, searching raw data for Log.csv')
                 ana_voltage = np.loadtxt(rf"{folder.replace('Raw','Processed')}\Log.csv",delimiter=',', skiprows=2)[:,1]
         if sys==True:
-            eV = np.array(ana_voltage)*factor_helios+corr
+            if calib is None:
+                coeffs = np.loadtxt('calib_default.csv')
+            if type(calib) is str:
+                coeffs = np.loadtxt(calib)
+            eV = np.array(np.polyval(coeffs, ana_voltage))
         if sys==False:
+            factor_nova=1/2.84
             eV = np.array((ana_voltage*factor_nova))
         
     if 'Raw' in folder:
@@ -233,8 +238,13 @@ def load(folder, factor_helios=-0.39866666666666667, factor_nova=1/2.84, corr=6,
         #stack_meta[f'img{len(stack)}']['Processing']['temp_match']['path'] = temp_path.tolist()
         #stack_meta[f'img{len(stack)}']['Processing']['temp_match']['area'] = area
         if sys==True:
-            eV = np.array(ana_voltage)*factor_helios+corr
+            if calib is None:
+                coeffs = np.loadtxt('calib_default.csv')
+            if type(calib) is str:
+                coeffs = np.loadtxt(calib)
+            eV = np.array(np.polyval(coeffs, ana_voltage))
         if sys==False:
+            factor_nova=1/2.84
             eV = np.array((ana_voltage*factor_nova))
     return stack, stack_meta, eV, dtype_info, name
 
@@ -311,11 +321,14 @@ def align_img_pcc(ref_img, mov_img, crop_y=None, crop_x=None, upsample_factor = 
     reg_img = np.array(reg_img)
     return reg_img, shift_y, shift_x
 
-def conversion(stack_meta, factor, corr):
+def MV(stack_meta):
     MV = []
     for page in stack_meta:
         MV.append(stack_meta[page]['TLD']['Mirror'])
-    eV = (np.array(MV)*factor)+corr
+    return MV
+
+def conversion(stack_meta, factor, corr):
+    eV = (np.array(MV(stack_meta))*factor)+corr
     return eV
 
 def plot_axes(norm=False):
@@ -423,13 +436,24 @@ def roi_masks(img, rois_data):
             img_mask = np.ma.mask_or(img_mask,mask)
             rois[name]['img_mask'] = img_mask
     if '.npy' in rois_data:
-        rois = {}
+        rois={}
         masks = np.load(rois_data)
         i=0
         while i <= masks.max():
             rois[i] = {}
             rois[i]['img_mask'] = np.where(masks==i,True,False)
             i+=1
+    if type(rois_data) is np.ndarray:
+        rois={}
+        ygrid, xgrid = np.mgrid[:y, :x]
+        xypix = np.vstack((xgrid.ravel(), ygrid.ravel())).T
+        img_mask = np.ma.getmask(np.ma.array(img_r, mask=False))
+        pth = Path(rois_data, closed=False)
+        mask = pth.contains_points(xypix)
+        mask = mask.reshape(y,x)
+        img_mask = np.ma.mask_or(img_mask,mask)
+        rois[0]={}
+        rois[0]['img_mask'] = img_mask
     return rois
 
 def load_roi_file(path_to_roi_file):
@@ -474,14 +498,12 @@ def load_roi_file(path_to_roi_file):
     return r
 
 class data:
-    factor = -0.39866666666666667
-    corr = 6
-    def __init__(self, folder, AC=True, reg=True):
+    def __init__(self, folder, AC=True, calib=None, reg=True):
         self.date = regex.search("(\d{6})|(\d*-[\d-]*\d)", folder).group(0)
         if AC is True and 'Raw' in folder and os.path.exists(rf'{folder}_R'):
-            stack,stack_meta,self.eV,self.dtype_info,name = load(folder,register=reg)
+            stack,stack_meta,self.eV,self.dtype_info,name = load(folder, calib=calib, register=reg)
             stack_r_file = rf'{folder}_R'
-            stack_r, stack_meta_r, eV_r, dtype_info_r, name_r = load(stack_r_file)
+            stack_r, stack_meta_r, eV_r, dtype_info_r, name_r = load(stack_r_file, calib=calib, register=reg)
             self.folder = rf'{folder}_AC'
             for page,page_r in zip(stack_meta,stack_meta_r):
                 stack_meta[page]['Processing']['angular_correction'] = 'True'
@@ -587,7 +609,7 @@ class data:
             self.shape = self.stack.shape
         else:
             self.folder = folder
-            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name = load(folder,AC=False,register=reg)
+            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name = load(folder,calib=calib, AC=False,register=reg)
             self.shape = self.stack.shape
     def rows(self, xmin=0, xmax=7):
         rows = np.where((self.eV>=0)&(self.eV<=7))[0]
@@ -622,6 +644,7 @@ class data:
         shifts={}
         shift_x=[]
         shift_y=[]
+        
         for page in self.stack_meta:
             shift_x.append(self.stack_meta[page]['Processing']['transformation']['x'])
             shift_y.append(self.stack_meta[page]['Processing']['transformation']['y'])
@@ -649,9 +672,11 @@ class data:
             plt.axis('off')
         if plot is True:
             plt.show()
-    def plot_spec(self, rois=None, plot=True):
+    def plot_spec(self, rois=None, plot=True, xlim=[-1,8]):
+        xlim=np.array(xlim)
+        rows = np.where((self.eV>=xlim[0])&(self.eV<=xlim[1]))[0]
         if rois is None:
-            plt.plot(self.eV, data.spec(self))
+            plt.plot(self.eV[rows], data.spec(self)[rows])
             plot_axes()
             if plot:
                 plt.show()
@@ -667,7 +692,7 @@ class data:
             for i, (name,c) in enumerate(zip(r,color)):
                 if not 'spec' in r[name]:
                     r[name]['spec'] = data.spec(self, rois)[name]['spec']
-                plt.plot(self.eV, data.spec(self, rois)[name]['spec'], c=c, label=name)
+                plt.plot(self.eV[rows], data.spec(self, rois)[name]['spec'][rows], c=c, label=name)
                 img_mask = np.where(r[name]['img_mask']==True,i+1,0)
                 masks = masks+img_mask
             masks = masks-1
@@ -686,7 +711,7 @@ class data:
         plt.plot(self.eV, data.zpro(self))
         plot_axes()
         plt.show()
-    def plot_stack_meta(self, save_path=None):
+    def plot_stack_meta(self, reg, save_path=None):
         sys, analyser = sys_type(self.stack_meta['img1'])
         ChPressure=[]
         V=[]
@@ -695,19 +720,20 @@ class data:
             V.append(self.stack_meta[page]['TLD'][analyser])
             ChPressure.append(self.stack_meta[page]['Vacuum']['ChPressure'])
             slices.append(i+1)
-        shifts = self.reg_tforms()
         
         fig, axs = plt.subplots(3, sharex=True, gridspec_kw={'height_ratios': [3, 2, 1]})
         fig.suptitle(f"{self.date}_{self.name}")
         ### plot reg_tforms ###
-        axs[0].plot(slices,shifts[0][:,0], 'o', color='r')
-        axs[0].plot(slices,shifts[0][:,1], 'o', color='b')
-        axs[0].legend(['x_shift','y_shift'])
-        if '_AC' in self.name and 'angular_correction' in self.stack_meta['img1']['Processing']:
-            for i,page in enumerate(self.stack_meta):
-                axs[0].plot(slices,shifts[1][:,0], 'ks', markerfacecolor='none', color='c')
-                axs[0].plot(slices,shifts[1][:,1], 'ks', markerfacecolor='none', color='m')
-            axs[0].legend(['x_shift','y_shift','x_shift_r','y_shift_r'])
+        if reg is True:
+            shifts = self.reg_tforms()
+            axs[0].plot(slices,shifts[0][:,0], 'o', color='r')
+            axs[0].plot(slices,shifts[0][:,1], 'o', color='b')
+            axs[0].legend(['x_shift','y_shift'])
+            if '_AC' in self.name and 'angular_correction' in self.stack_meta['img1']['Processing']:
+                for i,page in enumerate(self.stack_meta):
+                    axs[0].plot(slices,shifts[1][:,0], 'ks', markerfacecolor='none', color='c')
+                    axs[0].plot(slices,shifts[1][:,1], 'ks', markerfacecolor='none', color='m')
+                axs[0].legend(['x_shift','y_shift','x_shift_r','y_shift_r'])
         
         axs[1].plot(slices, zpro(self.stack), 'k', label='Zpro.')
         axs[1].set(ylabel='slice mean')
@@ -720,7 +746,7 @@ class data:
             plt.show()
         if save_path is None:
             plt.show()
-    def save_data(self, save_path=None):
+    def save_data(self, reg, save_path=None):
         if save_path is None:
             if 'Raw' in self.folder:
                 save_path = self.folder.replace('Raw','Processed')
@@ -734,7 +760,7 @@ class data:
                    resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'unit': 'um', 'axes':'YX'})
         labels = []
         for i,page in enumerate(self.stack_meta):
-            labels.append(rf'TLD_Mirror{i+1}_'+str(self.stack_meta[page]['TLD']['Mirror']))
+            labels.append(rf'TLD_Mirror{i+1}_'+str(self.stack_meta[page]['TLD']['Mirror'])+'.tif')
         tf.imwrite(rf'{save_path}\{self.name}_stack.tif',
                    self.stack, dtype=self.dtype_info.dtype, photometric='minisblack', imagej=True,
                    resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'spacing':1, 'unit': 'um', 'axes':'ZYX', 'Labels':labels}) #make numpy array into multi page OME-TIF format (Bio - formats)
@@ -748,5 +774,5 @@ class data:
             with open(rf'{save_path}\Metadata\{self.name}_stack_meta_r.json', 'w') as f:
                 json.dump(self.stack_meta_r, f)
             f.close()
-        data.plot_stack_meta(self, save_path=rf'{save_path}\Metadata\{self.name}_stack_meta_plots.png')
+        data.plot_stack_meta(self, reg, save_path=rf'{save_path}\Metadata\{self.name}_stack_meta_plots.png')
         plot_scalebar(data.img_avg(self), stack_meta=self.stack_meta, save_path=rf'{save_path}\{self.name}_avg_img_scaled.png')
