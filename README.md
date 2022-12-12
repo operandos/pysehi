@@ -26,3 +26,6 @@ Any number of sub-classes can be provided after 'material' and after 'YYMMDD' in
 **avg_img.tif** - Average image of SEHI data volume along energy axis. Scale metadata compatible with FIJI (ImageJ).  
 **avg_img_scaled.png** - Normalised average image with scalebar saved at 400 dpi.  
 **stack_meta.json** - Dictionary structure of FEI/ThermoScientific image metadata for each slice in the SEHI data volume.  
+
+## Citation
+Please cite use of the pysehi functions and processing scripts by refering to the most recent pysehi release hosted at 10.15131/shef.data.21647084
