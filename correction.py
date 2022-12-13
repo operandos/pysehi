@@ -11,12 +11,58 @@ import math
 from scipy.ndimage import gaussian_filter as gf
 import tifffile as tf
 import matplotlib.pyplot as plt
+from pyvsnr import VSNR
+import time
 
 test_img_path = r"G:\My Drive\Data\Collaboration\Processed\Loughborough\NMC\622\cathode\221209\BC1\BC1_avg_img.tif"
 img = ps.load_single_file(test_img_path)[0]
 
-def curtains_correction(img, radius=150, start_angle=177, end_angle=183):
-    amp = fft(img)
+def curtains_removal_vsnr(img, maxit=15):
+    if len(img.shape) == 3:
+        z,y,x = img.shape
+        stack = np.asarray(img, dtype='float64')
+    if len(img.shape) == 2:
+        y,x = img.shape
+        img=np.asarray(img, dtype'float64')
+    if y%2 != 0:
+        y-=1
+    if x%2 != 0:
+        x-=1
+    
+    # vsnr object creation
+    vsnr = VSNR([y,x])
+    
+    # add filter (at least one !)
+    vsnr.add_filter(alpha=1e-2, name='gabor', sigma=(1, 30), theta=358)
+    
+    # vsnr initialization
+    vsnr.initialize()
+
+    # image processing
+    stack_corr = []
+    t0 = time.process_time()
+    for i,page in enumerate(stack):
+        t1 = time.process_time()
+        img_corr = vsnr.eval(page[:y,:x], maxit=maxit, cvg_threshold=1e-4)
+        img_corr_uint8 = np.asarray(img_corr, dtype='uint8')
+        stack_corr.append(img_corr_uint8)
+        #print("CPU/GPU running time :", time.process_time() - t1, "\t remaining: ", len(stack)-i-1)
+    print("DONE!..........elapsed time :", time.process_time() - t0)
+    stack_corr = np.asarray(stack_corr)
+    
+    # plotting
+    fig0 = plt.figure(figsize=(12, 6))
+    fig0.sfn = "ex_fib_sem"
+    plt.subplot(121)
+    plt.title("Original")
+    plt.imshow(np.average(stack,0), cmap='gray')
+    plt.subplot(122)
+    plt.title("Corrected")
+    plt.imshow(np.average(stack_corr,0), cmap='gray')
+    plt.tight_layout()
+
+def curtains_correction(img, radius=200, start_angle=179, end_angle=181):
+    amp = cheatfft(img)
     rois = segment_mask(img, radius, start_angle, end_angle)
     mask = rois[0]['img_mask']
     mask_app = np.ones((amp.shape))
@@ -55,12 +101,12 @@ def segment_mask(img, radius, start_angle, end_angle):
     rois[0]['img_mask'] = np.ma.mask_or(rois[0]['img_mask'],np.flip(rois[0]['img_mask']))
     return rois
 
-def fft(img, plot=False):
+def cheatfft(img, plot=False):
     amp = (np.fft.fftshift(np.fft.fft2(img)))
     return amp
     if plot:
         plt.imshow(np.log(np.abs(amp)))
-        plt.imshow()
+        plt.show()
 
 def relabel(data):
     if type(data) is str:

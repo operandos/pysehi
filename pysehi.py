@@ -131,7 +131,7 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
                         data_files[rf'{date}_{name}']['Raw_path'] = 'not known at this address'
     return data_files                      
 
-def load(folder, AC=True, register=True, calib=None): #add roi input here
+def load(folder, AC=True, register=True, calib=None):
     name = os.path.split(folder)[1]
     if 'Processed' in folder and os.path.exists(rf'{folder}\Metadata'):
         processed = True
