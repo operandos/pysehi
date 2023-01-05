@@ -41,6 +41,8 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
         data_files = files
     for name in data_files:
         root = data_files[name]['Raw_path']
+        if os.path.exists(root.replace('Raw','Processed')) is True:
+            print(r'already processed files associated with Raw_path')
         if os.path.exists(root.replace('Raw','Processed')) is False:
             if '_R' not in root:
                 print(rf'loading.....................{root}')
@@ -52,13 +54,11 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
                 if AC is False:
                     print(rf'loading.....................{root}')
                     data_files[name]['Processed_path'] = root.replace('Raw','Processed')
-                    data(root, AC=AC, reg=register).save_data()
+                    data(root, AC=AC, reg=register).save_data(reg=register)
                     data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
                     print(rf"processed!..................{root.replace('Raw','Processed')}")
                 #if AC is True:
                 #    print(rf'AC is True, discounted......{root}')
-        if os.path.exists(root.replace('Raw','Processed')) is True:
-            print(r'already processed files associated with Raw_path')
     data_pro_path = files.replace('Raw','Processed')
     output.summary_excel(data_pro_path, condition_true, condition_false)
 
@@ -169,7 +169,9 @@ def load(folder, AC=True, register=True, calib=None):
                 ana_voltage = np.loadtxt(rf"{folder.replace('Raw','Processed')}\Log.csv",delimiter=',', skiprows=2)[:,1]
         if sys==True:
             if calib is None:
-                coeffs = np.loadtxt('calib_default.csv')
+                module_dir = os.path.dirname(__file__)
+                csv_file_path = os.path.join(module_dir, 'calib_default.csv')
+                coeffs = np.loadtxt(csv_file_path)
             if type(calib) is str:
                 coeffs = np.loadtxt(calib)
             eV = np.array(np.polyval(coeffs, ana_voltage))
