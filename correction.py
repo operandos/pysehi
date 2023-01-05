@@ -17,13 +17,12 @@ import time
 test_img_path = r"G:\My Drive\Data\Collaboration\Processed\Loughborough\NMC\622\cathode\221209\BC1\BC1_avg_img.tif"
 img = ps.load_single_file(test_img_path)[0]
 
-def curtains_removal_vsnr(img, maxit=15):
-    if len(img.shape) == 3:
-        z,y,x = img.shape
-        stack = np.asarray(img, dtype='float64')
-    if len(img.shape) == 2:
-        y,x = img.shape
-        img=np.asarray(img, dtype'float64')
+def curtains_removal_vsnr(data, maxit=15):
+    if type(data) is str:
+        data = ps.data(data)
+    stack = data.stack
+    z,y,x = data.shape
+    stack = np.asarray(data.stack, dtype='float64')
     if y%2 != 0:
         y-=1
     if x%2 != 0:
@@ -44,12 +43,24 @@ def curtains_removal_vsnr(img, maxit=15):
     for i,page in enumerate(stack):
         t1 = time.process_time()
         img_corr = vsnr.eval(page[:y,:x], maxit=maxit, cvg_threshold=1e-4)
-        img_corr_uint8 = np.asarray(img_corr, dtype='uint8')
-        stack_corr.append(img_corr_uint8)
+        img_corr_dtype = np.asarray(img_corr, dtype=data.dtype_info.dtype)
+        stack_corr.append(img_corr_dtype)
+        if i==0:
+            time_img = time.process_time() - t1
+            print("single img run time :", time_img, "\t no. imgs :", len(stack), "\t expt time :", round(len(stack)*time_img,0), " s")
         #print("CPU/GPU running time :", time.process_time() - t1, "\t remaining: ", len(stack)-i-1)
     print("DONE!..........elapsed time :", time.process_time() - t0)
     stack_corr = np.asarray(stack_corr)
+    avg_img_corr = np.asarray(np.average(stack_corr,axis=0),dtype=data.dtype_info.dtype)
     
+    ### save outputs ###
+    relabel(data, stack_corr, name='stack_corr')
+    pixel_width_um = data.stack_meta['img1']['Scan']['PixelWidth']*1e6
+    tf.imwrite(rf'{data.folder}\{data.name}_avg_img_corr.tif',
+           data=avg_img_corr, dtype=data.dtype_info.dtype, photometric='minisblack', imagej=True, 
+           resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'unit': 'um', 'axes':'YX'})
+    ps.plot_scalebar(avg_img_corr, stack_meta=data.stack_meta, save_path=rf'{data.folder}\{data.name}_avg_img_corr_scaled.png')
+
     # plotting
     fig0 = plt.figure(figsize=(12, 6))
     fig0.sfn = "ex_fib_sem"
@@ -60,6 +71,7 @@ def curtains_removal_vsnr(img, maxit=15):
     plt.title("Corrected")
     plt.imshow(np.average(stack_corr,0), cmap='gray')
     plt.tight_layout()
+    plt.show()
 
 def curtains_correction(img, radius=200, start_angle=179, end_angle=181):
     amp = cheatfft(img)
@@ -108,7 +120,7 @@ def cheatfft(img, plot=False):
         plt.imshow(np.log(np.abs(amp)))
         plt.show()
 
-def relabel(data):
+def relabel(data, stack_corr=None, name='stack'):
     if type(data) is str:
         data = ps.data(data)
     labels = []
@@ -116,7 +128,10 @@ def relabel(data):
         labels.append(rf'TLD_Mirror{i+1}_'+str(data.stack_meta[page]['TLD']['Mirror'])+'.tif')
     pixel_width_um = data.stack_meta['img1']['Scan']['PixelWidth']*1e6
     save_path = data.folder
-    tf.imwrite(rf'{save_path}\{data.name}_stack.tif',
-               data.stack, dtype=data.dtype_info.dtype, photometric='minisblack', imagej=True,
+    if stack_corr is not None:
+        stack = stack_corr
+    if stack_corr is None:
+        stack = data.stack
+    tf.imwrite(rf'{save_path}\{data.name}_{name}.tif',
+               stack, dtype=data.dtype_info.dtype, photometric='minisblack', imagej=True,
                resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'spacing':1, 'unit': 'um', 'axes':'ZYX', 'Labels':labels}) #make numpy array into multi page OME-TIF format (Bio - formats)
-    
