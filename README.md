@@ -9,7 +9,6 @@
 Create a pysehi environment and install the dependancies using [anaconda prompt](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file) and either:  
  - **pysehi_dependencies.yml** (with Jupyter Notebook to run processing and analysis scripts)  
  - **pysehi_dependencies_spyder.yml** (with Spyder IDE, for development)  
-
 ### Activate pysehi
 In Anaconda Prompt run:
   1) `activate sehi`
