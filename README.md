@@ -5,10 +5,12 @@
 *(a) SEHI data volume with outlined regions of interest. (b) SE spectra derived from regions of interest in (a) with labelled spectral features. Reproduced from https://doi.org/10.1016/j.micron.2022.103234 under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)*.
 
 ## Get started
+###Installation
 Create a pysehi environment and install the dependancies using [anaconda prompt](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file) and either:  
  - **pysehi_dependencies.yml** (with Jupyter Notebook to run processing and analysis scripts)  
  - **pysehi_dependencies_spyder.yml** (with Spyder IDE, for development)  
 
+###Activating the environment
 In Anaconda Prompt run:
   1) `activate sehi`
   2) `cd *...\some_path\pysehi*`  
