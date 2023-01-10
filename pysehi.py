@@ -25,6 +25,8 @@ from skimage.registration import phase_cross_correlation as pcc
 from skimage import img_as_ubyte
 from skimage import img_as_float
 import read_roi
+from deepdiff import DeepDiff
+from engineering_notation import EngNumber
 import output
 
 def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None,register=True):
@@ -169,9 +171,11 @@ def load(folder, AC=True, register=True, calib=None):
                 ana_voltage = np.loadtxt(rf"{folder.replace('Raw','Processed')}\Log.csv",delimiter=',', skiprows=2)[:,1]
         if sys==True:
             if calib is None:
-                module_dir = os.path.dirname(__file__)
-                csv_file_path = os.path.join(module_dir, 'calib_default.csv')
-                coeffs = np.loadtxt(csv_file_path)
+                csv_file_path = calib_file(folder)
+                if '.csv' in csv_file_path:
+                    coeffs = np.loadtxt(csv_file_path)
+                if csv_file_path == 'no calibration file':
+                    coeffs = -0.398666666666666, 6
             if type(calib) is str:
                 coeffs = np.loadtxt(calib)
             eV = np.array(np.polyval(coeffs, ana_voltage))
@@ -241,7 +245,11 @@ def load(folder, AC=True, register=True, calib=None):
         #stack_meta[f'img{len(stack)}']['Processing']['temp_match']['area'] = area
         if sys==True:
             if calib is None:
-                coeffs = np.loadtxt('calib_default.csv')
+                csv_file_path = calib_file(folder)
+                if '.csv' in csv_file_path:
+                    coeffs = np.loadtxt(csv_file_path)
+                if csv_file_path == 'no calibration file':
+                    coeffs = -0.398666666666666, 6
             if type(calib) is str:
                 coeffs = np.loadtxt(calib)
             eV = np.array(np.polyval(coeffs, ana_voltage))
@@ -283,6 +291,47 @@ def sys_type(metadata):
         analyser = 'Deflector'
     return sys, analyser
 
+def meta_prop(prop, stack_meta=None, check_prop=False, readable=True):
+    prop_list = ['curr','accel','uc','wd','r','x','y','z','hfw','average','interlacing','dwell', 'step', 'range']
+    if any(prop in p for p in prop_list):
+        if prop == 'curr':
+            k,unit = ['EBeam','BeamCurrent'], 'A'
+        if prop == 'accel':
+            k,unit = ['Beam','HV'], 'V'
+        if prop == 'uc':
+            k,unit = ['EBeam','BeamMode'], ''
+        if prop == "wd":
+            k,unit = ['Stage','WorkingDistance'], 'm'
+        if prop == "hfw":
+            k,unit = ['EScan','HorFieldsize'], 'm'
+        if prop == "interlacing":
+            k,unit = ['EScan','ScanInterlacing'], 'lines'
+        if prop == "dwell":
+            k,unit = ['EScan','Dwell'], 's'
+        if prop == "average":
+            k,unit = ['Image','Average'], 'frames'
+        if prop == "step" or "range":
+            k,unit = ['TLD','Mirror'], 'V'
+        if any(prop in s for s in ['r','x','y','z']):
+            k,unit = ['Stage',rf'Stage{prop.capitalize()}'], 'm'
+        if stack_meta is None:
+            return k
+        if type(stack_meta) is dict:
+            value = stack_meta['img1']
+            for key in k:
+                value = value.get(key)
+                if not value:
+                    break
+            if readable:
+                print(rf'{prop}','\t',EngNumber(value),unit)
+            if readable is False:
+                return k, value
+            
+
+def compare_params(stack_meta_1, stack_meta_2, drop:list=None):
+    diff = DeepDiff(stack_meta_1['img1'],stack_meta_2['img1'], exclude_paths=["root['PrivateFEI']", "root['User']", "root['System']", "root['Processing']", "root['GIS']"])
+    return diff
+    
 def metadata_warning(stack_meta):
     #do something about working distance, suction voltage, dwell, you know
     return
@@ -328,6 +377,19 @@ def MV(stack_meta):
     for page in stack_meta:
         MV.append(stack_meta[page]['TLD']['Mirror'])
     return MV
+
+def calib_file(path, filename=None):
+    if filename is None:
+        filename = 'calibration.csv'
+    while os.path.exists(rf'{os.path.split(path)[0]}\{filename}') is False:
+        path = os.path.split(path)[0]
+        if len(path) < 6:
+            abort=True
+            return 'no calibration file'
+            break
+    #if abort is True:
+        #return 'no calibration file'
+    return rf'{os.path.split(path)[0]}\{filename}'
 
 def conversion(stack_meta, factor, corr):
     eV = (np.array(MV(stack_meta))*factor)+corr
@@ -710,7 +772,7 @@ class data:
                 #n=len(r)+1
                 plt.imshow(rgba)
     def plot_zpro(self):
-        plt.plot(self.eV, data.zpro(self))
+        plt.plot(self.eV, zpro(self.stack))
         plot_axes()
         plt.show()
     def plot_stack_meta(self, reg, save_path=None):
