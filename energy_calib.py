@@ -10,14 +10,21 @@ from natsort import natsorted
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import pysehi as ps
 
-path_to_files = r"G:\My Drive\Data\Collaboration\Processed\Loughborough\Si\221208\Si_calib_25pA_-3_MV"
-def energy_calib_coeffs(path_to_files):
-    data = ps.list_files(path_to_files, condition_true=['Si'], load_data=True)
+import sys
+sys.path.append(r"G:\My Drive\Code\Exports\GitHub\pysehi")
+import pysehi as ps
+import sys
+sys.path.append(r"G:\My Drive\Code\Exports\GitHub\private")
+import sespec as spc
+
+def energy_calib_coeffs(path_to_Si, HOPG_dat=None, HOPG_ref=None, csv_output=None):
+    data = ps.list_files(path_to_Si, condition_true=['Si'],condition_false=['_1'], load_data=True)
     
-    if not os.path.exists(rf'{path_to_files}\calibration_outputs'):
-        os.mkdir(rf'{path_to_files}\calibration_outputs')
+    if csv_output is None:
+        csv_output = path_to_Si
+    if not os.path.exists(rf'{path_to_Si}\calibration_outputs'):
+        os.mkdir(rf'{path_to_Si}\calibration_outputs')
     
     biases=[]
     for name in data:
@@ -47,7 +54,7 @@ def energy_calib_coeffs(path_to_files):
     plt.plot(x_interp[maxX],y_interp[maxX], 'kx', label = 'max grad')
     plt.legend(loc='lower right')
     plt.gca().invert_xaxis()
-    plt.savefig(rf'{path_to_files}\calibration_outputs\S-curve_with_max_grad_pts.png',dpi=400,transparent=True)
+    plt.savefig(rf'{path_to_Si}\calibration_outputs\S-curve_with_max_grad_pts.png',dpi=400,transparent=True)
     plt.show()
     
     E = np.array(biases)*-1
@@ -57,19 +64,46 @@ def energy_calib_coeffs(path_to_files):
     order = int(input('Intput polyfit order:   '))
     
     coeffs = np.polyfit(grx, E, order)
-    np.savetxt(rf'{path_to_files}\{np.datetime64("today")}_calib_coeffs.csv',coeffs) #put this file at the top of the directory
-    
     plt.plot(grx,E, 'ko')
     plt.plot(grx,np.polyval(coeffs, grx), 'k--')
     #plt.xlim(left=-0.5)
     plt.xlabel('MV at max grad [V]')
     plt.ylabel('Energy shift equivalent $\it{E}$ [eV]')
     plt.xlim()
-    #plt.annotate('$\it{E}$[eV] = '+f'{round(m1,4)}[eV/V]'+r' $\times$ MV[V] + '+f'{round(b1,3)}[eV]', [min(grx)+0.5,max(m1*np.array(grx)+b1)], fontsize=12)
     plt.annotate(coeffs, [min(grx)+0.5,max(np.polyval(coeffs, grx))], fontsize=10)
     #print(f'factor from grad = {m1}')
-    plt.savefig(rf'{path_to_files}\calibration_outputs\factor_plot.png',dpi=400,transparent=True)
+    plt.title('pre-shift coefficients')
+    plt.savefig(rf'{path_to_Si}\calibration_outputs\factor_plot.png',dpi=400,transparent=True)
     plt.show()
+    
+    if HOPG_dat is None:
+        np.savetxt(rf'{csv_output}\{np.datetime64("today")}_calibration.csv',coeffs)
+    if HOPG_dat is not None:
+        HOPG_dat = ps.data(HOPG_dat)
+        HOPG_ref = ps.data(HOPG_ref)
+        eV_pre = np.array(np.polyval(coeffs, ps.MV(HOPG_dat.stack_meta)))
+        max_HOPG_dat = eV_pre[np.argmax(HOPG_dat.spec())]
+        max_HOPG_ref = HOPG_ref.eV[np.argmax(HOPG_ref.spec())]
+        shift = max_HOPG_ref-max_HOPG_dat
+        coeffs[-1]=coeffs[-1]+shift
+        eV_post = np.array(np.polyval(coeffs, ps.MV(HOPG_dat.stack_meta)))
+        np.savetxt(rf'{csv_output}\{np.datetime64("today")}_calibration.csv',coeffs)
+        
+        fig = plt.figure(figsize=(8.5,4))
+        fig.suptitle('Reference HOPG plots',weight='bold')
+        plt.subplot(1,2,1)
+        plt.plot(HOPG_ref.eV, ps.norm(HOPG_ref.spec()),label='ref')
+        plt.plot(eV_pre, ps.norm(HOPG_dat.spec()),label='dat')
+        plt.title('Pre shift')
+        plt.legend()
+        plt.subplot(1,2,2)
+        plt.plot(HOPG_ref.eV, ps.norm(HOPG_ref.spec()),label='ref')
+        plt.plot(eV_post, ps.norm(HOPG_dat.spec()),label='dat')
+        plt.title(rf'Post shift (+{round(shift,8)})')
+        plt.legend()
+        plt.savefig(rf'{path_to_Si}\calibration_outputs\shift_plots.png',dpi=400,transparent=True)
+        plt.show()
+
     
     fig = plt.figure()
     ax1 = fig.add_subplot(111)
@@ -91,10 +125,7 @@ def energy_calib_coeffs(path_to_files):
     ax2.set_xticklabels(tick_f(tick_loc))
     ax2.set_xlim(ax1.get_xlim())
     ax2.set_xlabel('Energy equivalent ($\it{E}$) [eV] (+ 6 shift)')
-    plt.savefig(rf'{path_to_files}\calibration_outputs\S-curve_with_eV.png',dpi=400,transparent=True)
+    plt.savefig(rf'{path_to_Si}\calibration_outputs\S-curve_with_eV.png',dpi=400,transparent=True)
     plt.show()
+    
     return coeffs
-
-def energy_calib_shift(carbon_data):
-    
-    
