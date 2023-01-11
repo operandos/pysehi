@@ -134,6 +134,37 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
     return data_files                      
 
 def load(folder, AC=True, register=True, calib=None):
+    """
+    load a folder (path_to_file) containing a SEHI data volume
+
+    Parameters
+    ----------
+    folder : str
+        path_to_files.
+    AC : Bool, optional
+        Whether to do angular correction if there is an associated '{folder}_R' dataset. The default is True.
+    register : Bool, optional
+        Whether to register the SEHI data volume using image features and normalised coefficient correlation. The default is True.
+    calib : path_to .csv file, optional
+        If the system is a Helios SEM, the calibration.csv file can be specified. The default is None.
+        In None case, a calibration.csv is searched for in the filetree and if nothing is found, default calibration is applied.
+
+    Returns
+    -------
+    stack : numpy.ndarray
+        numpy array of dtype of the original images.
+    stack_meta : dict
+        dictionary of original image metadata. Also saved to stack_meta.json file.
+    eV : nump.ndarray
+        numpy array (float64) of eV values (from energy convertion of deflector voltages).
+    dtype_info : numpy.iinfo
+        stack and original image dtype.
+    name : str
+        name of data folder (leaf name).
+    coeffs: numpy.ndarray
+        numpy array (float64) of coefficients for energy conversion from MV
+
+    """
     name = os.path.split(folder)[1]
     if 'Processed' in folder and os.path.exists(rf'{folder}\Metadata'):
         processed = True
@@ -175,13 +206,13 @@ def load(folder, AC=True, register=True, calib=None):
                 if '.csv' in csv_file_path:
                     coeffs = np.loadtxt(csv_file_path)
                 if csv_file_path == 'no calibration file':
-                    coeffs = -0.398666666666666, 6
+                    coeffs = np.array((-0.39866667, 6))
             if type(calib) is str:
                 coeffs = np.loadtxt(calib)
             eV = np.array(np.polyval(coeffs, ana_voltage))
         if sys==False:
-            factor_nova=1/2.84
-            eV = np.array((ana_voltage*factor_nova))
+            coeffs=np.array(1/2.84)
+            eV = np.array((ana_voltage*coeffs))
         
     if 'Raw' in folder:
         processed = False
@@ -249,14 +280,14 @@ def load(folder, AC=True, register=True, calib=None):
                 if '.csv' in csv_file_path:
                     coeffs = np.loadtxt(csv_file_path)
                 if csv_file_path == 'no calibration file':
-                    coeffs = -0.398666666666666, 6
+                    coeffs = np.array((-0.39866667, 6))
             if type(calib) is str:
                 coeffs = np.loadtxt(calib)
             eV = np.array(np.polyval(coeffs, ana_voltage))
         if sys==False:
-            factor_nova=1/2.84
-            eV = np.array((ana_voltage*factor_nova))
-    return stack, stack_meta, eV, dtype_info, name
+            coeffs=np.array(1/2.84)
+            eV = np.array((ana_voltage*coeffs))
+    return stack, stack_meta, eV, dtype_info, name, coeffs
 
 def load_single_file(file, load_img = True):
     with tf.TiffFile(file) as tif:
@@ -329,7 +360,7 @@ def meta_prop(prop, stack_meta=None, check_prop=False, readable=True):
             
 
 def compare_params(stack_meta_1, stack_meta_2, drop:list=None):
-    diff = DeepDiff(stack_meta_1['img1'],stack_meta_2['img1'], exclude_paths=["root['PrivateFEI']", "root['User']", "root['System']", "root['Processing']", "root['GIS']"])
+    diff = DeepDiff(stack_meta_1['img1'],stack_meta_2['img1'], exclude_paths=["root['PrivateFEI']","root['PrivateFei']","root['User']", "root['System']", "root['Processing']", "root['GIS']"])
     return diff
     
 def metadata_warning(stack_meta):
@@ -467,6 +498,13 @@ def spec_dose(stack_meta):
         d_spec = 2*d_spec
     return d_spec
 
+def norm(data, n_min=False):
+    if n_min is False:
+        data_n=data/np.max(data)
+    if n_min is True:
+        data_n=(data-np.min(data))/(np.max(data)-np.min(data))
+    return data_n
+
 def roi_masks(img, rois_data):
     if type(img) is str:
         img = tf.imread(img)
@@ -565,7 +603,7 @@ class data:
     def __init__(self, folder, AC=True, calib=None, reg=True):
         self.date = regex.search("(\d{6})|(\d*-[\d-]*\d)", folder).group(0)
         if AC is True and 'Raw' in folder and os.path.exists(rf'{folder}_R'):
-            stack,stack_meta,self.eV,self.dtype_info,name = load(folder, calib=calib, register=reg)
+            stack,stack_meta,self.eV,self.dtype_info,name,coeffs = load(folder, calib=calib, register=reg)
             stack_r_file = rf'{folder}_R'
             stack_r, stack_meta_r, eV_r, dtype_info_r, name_r = load(stack_r_file, calib=calib, register=reg)
             self.folder = rf'{folder}_AC'
@@ -671,9 +709,10 @@ class data:
             self.stack_meta_r = stack_meta_r
             self.name = rf'{name}_AC'
             self.shape = self.stack.shape
+            self.coeffs = coeffs
         else:
             self.folder = folder
-            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name = load(folder,calib=calib, AC=False,register=reg)
+            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name, self.coeffs = load(folder,calib=calib, AC=False,register=reg)
             self.shape = self.stack.shape
     def rows(self, xmin=0, xmax=7):
         rows = np.where((self.eV>=0)&(self.eV<=7))[0]
