@@ -25,8 +25,6 @@ from skimage.registration import phase_cross_correlation as pcc
 from skimage import img_as_ubyte
 from skimage import img_as_float
 import read_roi
-from deepdiff import DeepDiff
-from engineering_notation import EngNumber
 import output
 
 def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None,register=True):
@@ -321,51 +319,6 @@ def sys_type(metadata):
         sys = False
         analyser = 'Deflector'
     return sys, analyser
-
-def meta_prop(prop, stack_meta=None, check_prop=False, readable=True):
-    prop_list = ['curr','accel','uc','wd','r','x','y','z','hfw','average','interlacing','dwell', 'step', 'range']
-    if any(prop in p for p in prop_list):
-        if prop == 'curr':
-            k,unit = ['EBeam','BeamCurrent'], 'A'
-        if prop == 'accel':
-            k,unit = ['Beam','HV'], 'V'
-        if prop == 'uc':
-            k,unit = ['EBeam','BeamMode'], ''
-        if prop == "wd":
-            k,unit = ['Stage','WorkingDistance'], 'm'
-        if prop == "hfw":
-            k,unit = ['EScan','HorFieldsize'], 'm'
-        if prop == "interlacing":
-            k,unit = ['EScan','ScanInterlacing'], 'lines'
-        if prop == "dwell":
-            k,unit = ['EScan','Dwell'], 's'
-        if prop == "average":
-            k,unit = ['Image','Average'], 'frames'
-        if prop == "step" or "range":
-            k,unit = ['TLD','Mirror'], 'V'
-        if any(prop in s for s in ['r','x','y','z']):
-            k,unit = ['Stage',rf'Stage{prop.capitalize()}'], 'm'
-        if stack_meta is None:
-            return k
-        if type(stack_meta) is dict:
-            value = stack_meta['img1']
-            for key in k:
-                value = value.get(key)
-                if not value:
-                    break
-            if readable:
-                print(rf'{prop}','\t',EngNumber(value),unit)
-            if readable is False:
-                return k, value
-            
-
-def compare_params(stack_meta_1, stack_meta_2, drop:list=None):
-    diff = DeepDiff(stack_meta_1['img1'],stack_meta_2['img1'], exclude_paths=["root['PrivateFEI']","root['PrivateFei']","root['User']", "root['System']", "root['Processing']", "root['GIS']"])
-    return diff
-    
-def metadata_warning(stack_meta):
-    #do something about working distance, suction voltage, dwell, you know
-    return
 
 def template_crop(ref_img,y,x,hfw):
     w = hfw*1e6
