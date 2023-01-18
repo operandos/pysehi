@@ -62,7 +62,7 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
     data_pro_path = files.replace('Raw','Processed')
     output.summary_excel(data_pro_path, condition_true, condition_false)
 
-def list_files(path_to_files, date:int=None, condition_true:list=None, condition_false:list=None, load_data=False, custom_name=None):
+def list_files(path_to_files, date:int=None, condition_true:list=None, condition_false:list=None, load_data=False, uint8=False, custom_name=None):
     """
     List raw files for processing or processed files for analysis
     Requires data file structure to be located using the scheme ...\Raw\Material\YYMMDD\Subclass\folder
@@ -122,7 +122,7 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
                     data_files[rf'{date}_{name}']['Processed_path'] = root
                     data_files[rf'{date}_{name}']['data']={}
                     if load_data:
-                        data_files[rf'{date}_{name}']['data'] = data(data_files[rf'{date}_{name}']['Processed_path'])
+                        data_files[rf'{date}_{name}']['data'] = data(data_files[rf'{date}_{name}']['Processed_path'], force_uint8=uint8)
                     else:
                         data_files[rf'{date}_{name}']['data']['stack_meta'] = data(data_files[rf'{date}_{name}']['Processed_path']).stack_meta
                     if os.path.exists(root.replace('Processed','Raw')):
@@ -131,7 +131,7 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
                         data_files[rf'{date}_{name}']['Raw_path'] = 'not known at this address'
     return data_files                      
 
-def load(folder, AC=True, register=True, calib=None):
+def load(folder, AC=True, register=True, calib=None, uint8=False):
     """
     load a folder (path_to_file) containing a SEHI data volume
 
@@ -143,10 +143,11 @@ def load(folder, AC=True, register=True, calib=None):
         Whether to do angular correction if there is an associated '{folder}_R' dataset. The default is True.
     register : Bool, optional
         Whether to register the SEHI data volume using image features and normalised coefficient correlation. The default is True.
-    calib : path_to .csv file, optional
+    calib : str, optional
         If the system is a Helios SEM, the calibration.csv file can be specified. The default is None.
-        In None case, a calibration.csv is searched for in the filetree and if nothing is found, default calibration is applied.
-
+        In None case, a calibration.csv is searched for in the filetree and if nothing is found, calibration coefficients of (-0.39866667, 6) are used.
+    uint8 : Bool, optional
+        If True, convert stack data to uint8 dtype. Default is False which preserves original dtype.
     Returns
     -------
     stack : numpy.ndarray
@@ -174,6 +175,8 @@ def load(folder, AC=True, register=True, calib=None):
                 stack = tf.imread(stack_file)
             else:
                 stack = tf.imread(stack_file)
+        if uint8 is True:
+            stack = img_as_ubyte(stack)
         dtype_info = np.iinfo(stack.dtype)
         stack_meta_files = glob.glob(rf'{folder}\Metadata\*stack_meta*.json')
         if len(stack_meta_files)==0 and '_AC' in os.path.split(folder)[1]:
@@ -357,6 +360,20 @@ def align_img_pcc(ref_img, mov_img, crop_y=None, crop_x=None, upsample_factor = 
     return reg_img, shift_y, shift_x
 
 def MV(stack_meta):
+    """
+    return mirror voltages from stack metadata
+
+    Parameters
+    ----------
+    stack_meta : dict
+        dictionary of original image metadata. Also saved to stack_meta.json file.
+
+    Returns
+    -------
+    MV : numpy.ndarray
+        array of float64.
+
+    """
     MV = []
     for page in stack_meta:
         MV.append(stack_meta[page]['TLD']['Mirror'])
@@ -443,6 +460,8 @@ def spec_dose(stack_meta):
         n_px = stack_meta[page]['Image']['ResolutionX']*stack_meta[page]['Image']['ResolutionY']
         line_int = stack_meta[page]['EScan']['ScanInterlacing']
         n_average = stack_meta[page]['Scan']['Average']
+        if n_average==0:
+            n_average=1
         A = stack_meta[page]['Scan']['HorFieldsize']*stack_meta[page]['Scan']['VerFieldsize']
         d_img = ((I_0*t_dwell*n_px*n_average)/A)/line_int
         d_img_list.append(d_img)
@@ -553,12 +572,12 @@ def load_roi_file(path_to_roi_file):
     return r
 
 class data:
-    def __init__(self, folder, AC=True, calib=None, reg=True):
+    def __init__(self, folder, AC=True, calib=None, reg=True, force_uint8=False):
         self.date = regex.search("(\d{6})|(\d*-[\d-]*\d)", folder).group(0)
         if AC is True and 'Raw' in folder and os.path.exists(rf'{folder}_R'):
-            stack,stack_meta,self.eV,self.dtype_info,name,coeffs = load(folder, calib=calib, register=reg)
+            stack,stack_meta,self.eV,self.dtype_info,name,coeffs = load(folder, calib=calib, register=reg, uint8=force_uint8)
             stack_r_file = rf'{folder}_R'
-            stack_r, stack_meta_r, eV_r, dtype_info_r, name_r = load(stack_r_file, calib=calib, register=reg)
+            stack_r, stack_meta_r, eV_r, dtype_info_r, name_r = load(stack_r_file, calib=calib, register=reg, uint8=force_uint8)
             self.folder = rf'{folder}_AC'
             for page,page_r in zip(stack_meta,stack_meta_r):
                 stack_meta[page]['Processing']['angular_correction'] = 'True'
@@ -665,7 +684,7 @@ class data:
             self.coeffs = coeffs
         else:
             self.folder = folder
-            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name, self.coeffs = load(folder,calib=calib, AC=False,register=reg)
+            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name, self.coeffs = load(folder,calib=calib, AC=False,register=reg,uint8=force_uint8)
             self.shape = self.stack.shape
     def rows(self, xmin=0, xmax=7):
         rows = np.where((self.eV>=0)&(self.eV<=7))[0]
