@@ -16,7 +16,7 @@ def metadata_params(stack_meta=None, parameter=None, readable=True):
         params=parameter
     if stack_meta is None:
         keys={}
-    prop_list = ['curr','accel','uc','wd','r','x','y','z','hfw','average','interlacing','dwell', 'step', 'range']
+    prop_list = ['curr','accel','uc','wd','r','x','y','z','hfw','cntr','brtn','average','interlacing','dwell', 'step', 'range']
     if parameter is None:
         params=prop_list
     for prop in params:
@@ -31,6 +31,10 @@ def metadata_params(stack_meta=None, parameter=None, readable=True):
                 k,unit = ['Stage','WorkingDistance'], 'm'
             if prop == "hfw":
                 k,unit = ['EScan','HorFieldsize'], 'm'
+            if prop == "brtn":
+                k,unit = ['TLD','Brightness'], '%'
+            if prop == "cntr":
+                k,unit = ['TLD','Contrast'], '%'
             if prop == "interlacing":
                 k,unit = ['EScan','ScanInterlacing'], 'lines'
             if prop == "dwell":
@@ -71,6 +75,7 @@ def compare_params(stack_meta_1, stack_meta_2, readable=True, condition_true:lis
     for page in diff_out['values_changed']:
         diff[page.split("'")[1]][page.split("'")[3]]=diff_out['values_changed'][page]
         keys = metadata_params(parameter=condition_true)
+        """
         val = diff
         for keyc in keys:
             for kc in keys[keyc]:
@@ -78,15 +83,30 @@ def compare_params(stack_meta_1, stack_meta_2, readable=True, condition_true:lis
                 if not val:
                     break
                 print(val)
-        return diff
-    if readable is False:
-        return diff
+        """
+    return diff
     
-def params_warning(stack_meta, readable=True):
-    if round(metadata_params(stack_meta, 'wd', readable=False)[1],4) == 0.0040:
+def wd_check(stack_meta, readable=True, distance=0.0040):
+    """
+    check that the working distance is 4.0 mm
+    
+    Parameters
+    ----------
+    stack_meta : dict
+        dict of stack metadata.
+    readable : bool, optional
+        If readable is True, print result. The default is True.
+
+    Returns
+    -------
+    bool
+        True - the wd is 4 mm.
+
+    """
+    if round(metadata_params(stack_meta, 'wd', readable=False)[1],4) == distance:
         if readable is False:
             return True
-    if round(metadata_params(stack_meta, 'wd', readable=False)[1],4) != 0.0040:
+    if round(metadata_params(stack_meta, 'wd', readable=False)[1],4) != distance:
         if readable is True:
             print('\t\tWARNING !','\t\t', 'Working distance is \t', metadata_params(stack_meta, 'wd', readable=False)[1]*1000,' mm')
         if readable is False:
