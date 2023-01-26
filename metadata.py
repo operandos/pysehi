@@ -8,17 +8,35 @@ Created on Thu Jan 12 14:12:09 2023
 from deepdiff import DeepDiff
 from engineering_notation import EngNumber
 
-def metadata_params(stack_meta=None, parameter=None, readable=True):
+def metadata_params(stack_meta=None, name=None, parameter=None, parameter_false=None,readable=True):
     params=[]
     if type(parameter) is str:
         params.append(parameter)
     if type(parameter) is list:
         params=parameter
-    if stack_meta is None:
-        keys={}
-    prop_list = ['curr','accel','uc','wd','r','x','y','z','hfw','cntr','brtn','average','interlacing','dwell', 'step', 'range']
+    params_false=[]
+    if type(parameter_false) is str:
+        params_false.append(parameter_false)
+    if 'stage' in params_false:
+        params_false.extend(['r','x','y','z'])
+        params_false.remove('stage')
+    if type(parameter_false) is list:
+        params_false=parameter_false
+    prop_list = ['curr','accel','uc','dwell','wd','r','x','y','z','hfw','px','py','average','integrate','interlacing','cntr','brtn','step', 'range']
     if parameter is None:
         params=prop_list
+    if type(params_false) is list:
+        for prop_f in params_false:
+            if any(prop_f in p for p in params):
+                params.remove(prop_f)
+    if readable is True:
+        if name is not None:
+            print('\n',rf'{name.center(42)}')
+        print('_'*42)
+        print('{:<15s} {:<15s} {:<15s}'.format('parameter','value','unit'))
+        print('_'*42)
+    if stack_meta is None:
+        keys={}
     for prop in params:
         if any(prop in p for p in prop_list):
             if prop == 'curr':
@@ -27,23 +45,31 @@ def metadata_params(stack_meta=None, parameter=None, readable=True):
                 k,unit = ['Beam','HV'], 'V'
             if prop == 'uc':
                 k,unit = ['EBeam','BeamMode'], ''
+            if prop == "dwell":
+                k,unit = ['EScan','Dwell'], 's'
             if prop == "wd":
                 k,unit = ['Stage','WorkingDistance'], 'm'
             if prop == "hfw":
                 k,unit = ['EScan','HorFieldsize'], 'm'
+            if prop == "px":
+                k,unit = ['Image', 'ResolutionX'], 'pixels'
+            if prop == "py":
+                k,unit = ['Image', 'ResolutionY'], 'pixels'
+            if prop == "average":
+                k,unit = ['Image','Average'], 'frames'
+            if prop == "integrate":
+                k,unit = ['Image','Integrate'], 'frames'
+            if prop == "interlacing":
+                k,unit = ['EScan','ScanInterlacing'], 'lines'
+            if prop == "step" or prop == "range":
+                k,unit = ['TLD','Mirror'], 'V'
+            if prop == "r":
+                k,unit = ['Stage','StageR'], 'rad'
             if prop == "brtn":
                 k,unit = ['TLD','Brightness'], '%'
             if prop == "cntr":
                 k,unit = ['TLD','Contrast'], '%'
-            if prop == "interlacing":
-                k,unit = ['EScan','ScanInterlacing'], 'lines'
-            if prop == "dwell":
-                k,unit = ['EScan','Dwell'], 's'
-            if prop == "average":
-                k,unit = ['Image','Average'], 'frames'
-            if prop == "step" or prop == "range":
-                k,unit = ['TLD','Mirror'], 'V'
-            if any(prop in s for s in ['r','x','y','z']):
+            if any(prop in s for s in ['x','y','z']):
                 k,unit = ['Stage',rf'Stage{prop.capitalize()}'], 'm'
             if stack_meta is None:
                 keys[prop]=k
@@ -67,14 +93,18 @@ def metadata_params(stack_meta=None, parameter=None, readable=True):
     if stack_meta is None:
         return keys
 
-def compare_params(stack_meta_1, stack_meta_2, readable=True, condition_true:list=None):
-    diff_out = DeepDiff(stack_meta_1['img1'],stack_meta_2['img1'], exclude_paths=["root['PrivateFEI']","root['PrivateFei']","root['User']", "root['System']", "root['Processing']", "root['GIS']"])
+def compare_params(meta_1, meta_2, readable=True, condition_true:list=None):
+    if 'img1' in meta_1.keys():
+        meta_1 = meta_1['img1']
+    if 'img1' in meta_2.keys():
+        meta_2 = meta_2['img1']
+    diff_out = DeepDiff(meta_1,meta_2, exclude_paths=["root['PrivateFEI']","root['PrivateFei']","root['User']", "root['System']", "root['Processing']", "root['GIS']"])
     diff={}
     for page in diff_out['values_changed']:
         diff[page.split("'")[1]]={}
     for page in diff_out['values_changed']:
         diff[page.split("'")[1]][page.split("'")[3]]=diff_out['values_changed'][page]
-        keys = metadata_params(parameter=condition_true)
+        keys = metadata_params(parameter=condition_true,readable=False)
         """
         val = diff
         for keyc in keys:
