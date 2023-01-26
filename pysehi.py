@@ -27,14 +27,14 @@ from skimage import img_as_float
 import read_roi
 import output
 
-def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None,register=True):
+def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None, register=True, custom_name=None):
     if type(files) is str:
         if regex.search("(\d{6})|(\d*-[\d-]*\d)", files) is None:
             print(r"Date missing!    Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
         if not 'Raw' in files:
             print(r"Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
         if 'Raw' in files:
-            data_files = list_files(files, condition_true, condition_false)
+            data_files = list_files(files, condition_true, condition_false, custom_name=custom_name)
         else:
             print(r"Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
     if type(files) is dict:
@@ -377,6 +377,7 @@ def MV(stack_meta):
     MV = []
     for page in stack_meta:
         MV.append(stack_meta[page]['TLD']['Mirror'])
+    MV=np.array(MV)
     return MV
 
 def calib_file(path, filename=None):
@@ -396,11 +397,15 @@ def conversion(stack_meta, factor, corr):
     eV = (np.array(MV(stack_meta))*factor)+corr
     return eV
 
-def plot_axes(norm=False):
+def plot_axes(norm=False, x_eV=True):
     plt.rcParams['mathtext.fontset'] = 'custom'
     plt.rcParams['mathtext.it'] = 'sans:italic:bold'
     plt.rcParams['mathtext.bf'] = 'sans:bold'
-    plt.xlabel('Energy, $\mathit{E}$ [eV]',weight='bold')
+    if x_eV is True:
+        plt.xlabel('Energy, $\mathit{E}$ [eV]',weight='bold')
+    if x_eV is False:
+        plt.xlabel('Mirror voltage [V]',weight='bold')
+        plt.gca().invert_xaxis()
     if norm == False:
         plt.ylabel('Emission intensity [arb.u.]',weight='bold')
     if norm == True:
@@ -458,14 +463,13 @@ def spec_dose(stack_meta):
         I_0 = stack_meta[page]['EBeam']['BeamCurrent']
         t_dwell = stack_meta[page]['Scan']['Dwelltime']
         n_px = stack_meta[page]['Image']['ResolutionX']*stack_meta[page]['Image']['ResolutionY']
-        line_int = stack_meta[page]['EScan']['ScanInterlacing']
+        #line_int = stack_meta[page]['EScan']['ScanInterlacing']
         n_average = stack_meta[page]['Scan']['Average']
-        if n_average==0:
-            n_average=1
+        n_integrate = stack_meta[page]['Scan']['Integrate']
         A = stack_meta[page]['Scan']['HorFieldsize']*stack_meta[page]['Scan']['VerFieldsize']
-        d_img = ((I_0*t_dwell*n_px*n_average)/A)/line_int
+        d_img = ((I_0*t_dwell*n_px*(n_average+n_integrate))/A)#/line_int
         d_img_list.append(d_img)
-        d_spec = np.sum(d_img_list)
+    d_spec = np.sum(d_img_list)
     if 'angular_correction' in stack_meta[page]['Processing']:
         d_spec = 2*d_spec
     return d_spec
@@ -686,8 +690,31 @@ class data:
             self.folder = folder
             self.stack, self.stack_meta, self.eV, self.dtype_info, self.name, self.coeffs = load(folder,calib=calib, AC=False,register=reg,uint8=force_uint8)
             self.shape = self.stack.shape
-    def rows(self, xmin=0, xmax=7):
-        rows = np.where((self.eV>=0)&(self.eV<=7))[0]
+    def rows(self, xlim=[0,7], x_eV=True):
+        """
+        return the indexes of values within eV ranges defined by xmin and xmax
+
+        Parameters
+        ----------
+        xlim : list, optional
+            [xmin,xmax] or 'all'. The default is [0,7].
+        x_eV : bool, optional
+            True gives eV indexes, False gives MV indexes. The default is 7.
+
+        Returns
+        -------
+        rows : numpy.ndarray
+            the indexes of values that lie within xmin and xmax unless span is false.
+
+        """
+        if x_eV is True:
+            x = self.eV
+        if x_eV is False:
+            x = MV(self.stack_meta)
+        if type(xlim) is list:
+            rows = np.where((x>=xlim[0])&(x<=xlim[1]))[0]
+        if xlim == 'all':
+            rows = self.eV.argsort()
         return rows
     def spec(self, rois = None):
         if rois is not None:
@@ -719,7 +746,6 @@ class data:
         shifts={}
         shift_x=[]
         shift_y=[]
-        
         for page in self.stack_meta:
             shift_x.append(self.stack_meta[page]['Processing']['transformation']['x'])
             shift_y.append(self.stack_meta[page]['Processing']['transformation']['y'])
@@ -747,12 +773,18 @@ class data:
             plt.axis('off')
         if plot is True:
             plt.show()
-    def plot_spec(self, rois=None, plot=True, xlim=[-1,8]):
+    def plot_spec(self, rois=None, plot=True, x_eV=True, xlim=[-1,8]):
         xlim=np.array(xlim)
-        rows = np.where((self.eV>=xlim[0])&(self.eV<=xlim[1]))[0]
+        if x_eV is True:
+            rows = np.where((self.eV>=xlim[0])&(self.eV<=xlim[1]))[0]
+        if x_eV is False:
+            rows = np.where((MV(self.stack_meta)>=xlim[0])&(MV(self.stack_meta)<=xlim[1]))[0]
         if rois is None:
-            plt.plot(self.eV[rows], data.spec(self)[rows])
-            plot_axes()
+            if x_eV is True:
+                plt.plot(self.eV[rows], data.spec(self)[rows])
+            if x_eV is False:
+                plt.plot(MV(self.stack_meta)[rows], data.spec(self)[rows])
+            plot_axes(x_eV=x_eV)
             if plot:
                 plt.show()
         if rois is not None:
@@ -767,7 +799,10 @@ class data:
             for i, (name,c) in enumerate(zip(r,color)):
                 if not 'spec' in r[name]:
                     r[name]['spec'] = data.spec(self, rois)[name]['spec']
-                plt.plot(self.eV[rows], data.spec(self, rois)[name]['spec'][rows], c=c, label=name)
+                if x_eV is True:
+                    plt.plot(self.eV[rows], data.spec(self, rois)[name]['spec'][rows], c=c, label=name)
+                if x_eV is False:
+                    plt.plot(MV(self.stack_meta)[rows], data.spec(self, rois)[name]['spec'][rows], c=c, label=name)
                 img_mask = np.where(r[name]['img_mask']==True,i+1,0)
                 masks = masks+img_mask
             masks = masks-1
@@ -776,15 +811,15 @@ class data:
             masks_n = norm(masks)
             rgba = cmap(masks_n)
             rgba[masks==-1,:] = [1,1,1,1]
-            plot_axes()
+            plot_axes(x_eV=x_eV)
             plt.legend()
             if plot:
                 plt.show()
                 #n=len(r)+1
                 plt.imshow(rgba)
-    def plot_zpro(self):
+    def plot_zpro(self, x_eV=True):
         plt.plot(self.eV, zpro(self.stack))
-        plot_axes()
+        plot_axes(x_eV=x_eV)
         plt.show()
     def plot_stack_meta(self, reg, save_path=None):
         sys, analyser = sys_type(self.stack_meta['img1'])
