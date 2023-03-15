@@ -27,6 +27,7 @@ Any number of sub-classes can be provided after 'material' and after 'YYMMDD' in
 
 ## Functions
 ### `process_files`
+#### Outputs
 **stack.tif** - Registered and cropped image stack. The SEHI data volume. Scale and slice label metadata compatible with FIJI (ImageJ).  
 **avg_img.tif** - Average image of SEHI data volume along energy axis. Scale metadata compatible with FIJI (ImageJ).  
 **avg_img_scaled.png** - Normalised average image with scalebar saved at 400 dpi.  
