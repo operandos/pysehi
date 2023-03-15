@@ -17,7 +17,7 @@ import time
 test_img_path = r"G:\My Drive\Data\Collaboration\Processed\Loughborough\NMC\622\cathode\221209\BC1\BC1_avg_img.tif"
 img = ps.load_single_file(test_img_path)[0]
 
-def curtains_removal_vsnr(data, maxit=15):
+def curtains_removal_vsnr(data, maxit=15, theta=2):
     if type(data) is str:
         data = ps.data(data)
     stack = data.stack
@@ -32,14 +32,15 @@ def curtains_removal_vsnr(data, maxit=15):
     vsnr = VSNR([y,x])
     
     # add filter (at least one !)
-    vsnr.add_filter(alpha=1e-2, name='gabor', sigma=(1, 30), theta=358)
+    vsnr.add_filter(alpha=1e-2, name='gabor', sigma=(1, 30), theta=theta)
     
     # vsnr initialization
     vsnr.initialize()
 
     # image processing
     stack_corr = []
-    t0 = time.process_time()
+    t0 = time.strftime("%H:%M:%S", time.localtime())
+    print(rf'began @ : {t0}')
     for i,page in enumerate(stack):
         t1 = time.process_time()
         img_corr = vsnr.eval(page[:y,:x], maxit=maxit, cvg_threshold=1e-4)
@@ -47,9 +48,10 @@ def curtains_removal_vsnr(data, maxit=15):
         stack_corr.append(img_corr_dtype)
         if i==0:
             time_img = time.process_time() - t1
-            print("single img run time :", time_img, "\t no. imgs :", len(stack), "\t expt time :", round(len(stack)*time_img,0), " s")
+            print("single img run time :", time_img, "\t no. imgs :", len(stack),
+                  "\t tot time :", round(len(stack)*time_img,0))#, " s", "\t exp time :", round(len(stack)*time_img,0),)
         #print("CPU/GPU running time :", time.process_time() - t1, "\t remaining: ", len(stack)-i-1)
-    print("DONE!..........elapsed time :", time.process_time() - t0)
+    print("DONE!..........elapsed time :", time.process_time())# - t0)
     stack_corr = np.asarray(stack_corr)
     avg_img_corr = np.asarray(np.average(stack_corr,axis=0),dtype=data.dtype_info.dtype)
     
@@ -135,3 +137,4 @@ def relabel(data, stack_corr=None, name='stack'):
     tf.imwrite(rf'{save_path}\{data.name}_{name}.tif',
                stack, dtype=data.dtype_info.dtype, photometric='minisblack', imagej=True,
                resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'spacing':1, 'unit': 'um', 'axes':'ZYX', 'Labels':labels}) #make numpy array into multi page OME-TIF format (Bio - formats)
+    
