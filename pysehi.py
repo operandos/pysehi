@@ -26,14 +26,15 @@ from skimage import img_as_ubyte
 from skimage import img_as_float
 import read_roi
 import output
+import metadata
 
-def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None, register=True, custom_name=None):
+def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None, register=True, custom_name=None, overview_img:str=None):
     if type(files) is str:
         if regex.search("(\d{6})|(\d*-[\d-]*\d)", files) is None:
             print(r"Date missing!    Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
-        if not 'Raw' in files:
+        elif not 'Raw' in files:
             print(r"Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
-        if 'Raw' in files:
+        elif 'Raw' in files in files:
             data_files = list_files(files, condition_true, condition_false, custom_name=custom_name)
         else:
             print(r"Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
@@ -49,6 +50,7 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
                 data_files[name]['Processed_path'] = root.replace('Raw','Processed')
                 data(root, AC=AC, reg=register).save_data(reg=register)
                 data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
+                metadata.metadata_params(data(root),write=True)
                 print(rf'processed!..................{root}')
             if '_R' in root:
                 if AC is False:
@@ -56,11 +58,14 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
                     data_files[name]['Processed_path'] = root.replace('Raw','Processed')
                     data(root, AC=AC, reg=register).save_data(reg=register)
                     data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
+                    metadata.metadata_params(data(root),write=True)
                     print(rf"processed!..................{root.replace('Raw','Processed')}")
                 #if AC is True:
                 #    print(rf'AC is True, discounted......{root}')
     data_pro_path = files.replace('Raw','Processed')
     output.summary_excel(data_pro_path, condition_true, condition_false)
+    if overview_img is not None:
+        output.location_mosaic(data_pro_path, overview_img, condition_false)
 
 def list_files(path_to_files, date:int=None, condition_true:list=None, condition_false:list=None, load_data=False, uint8=False, custom_name=None):
     """
@@ -92,6 +97,8 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
             if date is not None:
                 if not str(date) in root:
                     continue
+            if date is None:
+                date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
             if condition_true is not None:
                 if not any(c in root for c in condition_true):
                     continue
@@ -105,17 +112,23 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
                     file_str = 'TLD_Mirror'
                 if any('Log.csv' in file for file in file_list) or any(file_str in file for file in file_list):
                     name = os.path.split(root)[1]
-                    date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
-                    material = root.split(rf'\{date}')[0].split('Raw\\')[1]
+                    #date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
+                    if root.find(date)>root.find('Raw'):
+                        material = root.split(rf'\{date}')[0].split('Raw\\')[1]
+                    if root.find(date)<root.find('Raw'):
+                        material = root.split('Reference data\\')[1].split('\\')[0]
                     data_files[rf'{date}_{name}']={}
                     data_files[rf'{date}_{name}']['Date'] = date
                     data_files[rf'{date}_{name}']['Material'] = material
                     data_files[rf'{date}_{name}']['Raw_path'] = root
             if 'Processed' in path_to_files:
-                if any('stack.tif' in file for file in file_list) and not any(f in root for f in ['Metadata','Colour-out']):
+                if any('stack' in file for file in file_list) and not any(f in root for f in ['Metadata','Colour','colour','ROI']):
                     name = os.path.split(root)[1]
-                    date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
-                    material = root.split(rf'\{date}')[0].split('Processed\\')[1]
+                    #date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
+                    if root.find(date)>root.find('Processed'):
+                        material = root.split(rf'\{date}')[0].split('Processed\\')[1]
+                    if root.find(date)<root.find('Processed'):
+                        material = root.split('Reference data\\')[1].split('\\')[0]
                     data_files[rf'{date}_{name}']={}
                     data_files[rf'{date}_{name}']['Date'] = date
                     data_files[rf'{date}_{name}']['Material'] = material
@@ -168,13 +181,18 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
     if 'Processed' in folder and os.path.exists(rf'{folder}\Metadata'):
         processed = True
         stacks = glob.glob(rf'{folder}\*stack*.tif')
-        for stack_file in stacks:
-            if '_AC' in stack_file:
-                stack = tf.imread(stack_file)
-            if 'aligned' in stack_file:
-                stack = tf.imread(stack_file)
-            else:
-                stack = tf.imread(stack_file)
+        if len(stacks) == 1:
+            stack_file = stacks[0]
+            stack = tf.imread(stack_file)
+            stack_filename = os.path.split(stack_file)[1].split('.tif')[0]
+        #wildcards = ['_AC','_aligned','_corr']
+        else:
+            for qual in ['_seg_1','_seg','_corr','aligned','_AC']:
+                matching = [s for s in stacks if qual in s]
+                if len(matching) == 1:
+                    stack = tf.imread(matching[0])
+                    stack_filename = os.path.split(matching[0])[1].split('.tif')[0]
+                    break
         if uint8 is True:
             stack = img_as_ubyte(stack)
         dtype_info = np.iinfo(stack.dtype)
@@ -195,12 +213,12 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
             for page in stack_meta:
                 ana_voltage.append(stack_meta[page]['TLD']['Mirror'])
         if sys == False:
-            if stack_meta['img1']['TLD']['Deflector'] in stack_meta['img1']['TLD']:
+            if 'Deflector' in stack_meta['img1']['TLD']:
                 for page in stack_meta:
                     ana_voltage.append(stack_meta[page]['TLD']['Deflector'])
             else:
                 print('Warning, no Deflector in stack_meta, searching raw data for Log.csv')
-                ana_voltage = np.loadtxt(rf"{folder.replace('Raw','Processed')}\Log.csv",delimiter=',', skiprows=2)[:,1]
+                ana_voltage = np.loadtxt(rf"{folder.replace('Processed','Raw')}\Log.csv",delimiter=',', skiprows=2)[:,1]
         if sys==True:
             if calib is None:
                 csv_file_path = calib_file(folder)
@@ -217,6 +235,7 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
         
     if 'Raw' in folder:
         processed = False
+        stack_filename = rf'{name}_stack'
         files = glob.glob(rf'{folder}\*.tif')
         ana_voltage = []
         for file in files:
@@ -288,7 +307,7 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
         if sys==False:
             coeffs=np.array(1/2.84)
             eV = np.array((ana_voltage*coeffs))
-    return stack, stack_meta, eV, dtype_info, name, coeffs
+    return stack, stack_meta, eV, dtype_info, name, coeffs, stack_filename
 
 def load_single_file(file, load_img = True):
     with tf.TiffFile(file) as tif:
@@ -579,9 +598,9 @@ class data:
     def __init__(self, folder, AC=True, calib=None, reg=True, force_uint8=False):
         self.date = regex.search("(\d{6})|(\d*-[\d-]*\d)", folder).group(0)
         if AC is True and 'Raw' in folder and os.path.exists(rf'{folder}_R'):
-            stack,stack_meta,self.eV,self.dtype_info,name,coeffs = load(folder, calib=calib, register=reg, uint8=force_uint8)
+            stack,stack_meta,self.eV,self.dtype_info,name,coeffs,stack_filename = load(folder, calib=calib, register=reg, uint8=force_uint8)
             stack_r_file = rf'{folder}_R'
-            stack_r, stack_meta_r, eV_r, dtype_info_r, name_r = load(stack_r_file, calib=calib, register=reg, uint8=force_uint8)
+            stack_r, stack_meta_r, eV_r, dtype_info_r, name_r, coeffs_r,stack_filename_r = load(stack_r_file, calib=calib, register=reg, uint8=force_uint8)
             self.folder = rf'{folder}_AC'
             for page,page_r in zip(stack_meta,stack_meta_r):
                 stack_meta[page]['Processing']['angular_correction'] = 'True'
@@ -686,9 +705,10 @@ class data:
             self.name = rf'{name}_AC'
             self.shape = self.stack.shape
             self.coeffs = coeffs
+            self.stack_filename = rf'{stack_filename}_AC'
         else:
             self.folder = folder
-            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name, self.coeffs = load(folder,calib=calib, AC=False,register=reg,uint8=force_uint8)
+            self.stack, self.stack_meta, self.eV, self.dtype_info, self.name, self.coeffs, self.stack_filename = load(folder,calib=calib, AC=False,register=reg,uint8=force_uint8)
             self.shape = self.stack.shape
     def rows(self, xlim=[0,7], x_eV=True):
         """
@@ -716,11 +736,13 @@ class data:
         if xlim == 'all':
             rows = self.eV.argsort()
         return rows
+    def mv(self):
+        return MV(self.stack_meta)
     def spec(self, rois = None):
         if rois is not None:
             if type(rois) is not dict:
                 r = roi_masks(self.stack, rois)
-            if 'img_mask' not in rois[list(rois.keys())[0]]:
+            elif 'img_mask' not in rois[list(rois.keys())[0]]:
                 r = roi_masks(self.stack, rois)
             else:
                 r = rois
@@ -773,7 +795,7 @@ class data:
             plt.axis('off')
         if plot is True:
             plt.show()
-    def plot_spec(self, rois=None, plot=True, x_eV=True, xlim=[-1,8]):
+    def plot_spec(self, rois=None, plot=True, x_eV=True, xlim=[-1,8], savefig=False):
         xlim=np.array(xlim)
         if x_eV is True:
             rows = np.where((self.eV>=xlim[0])&(self.eV<=xlim[1]))[0]
@@ -785,13 +807,23 @@ class data:
             if x_eV is False:
                 plt.plot(MV(self.stack_meta)[rows], data.spec(self)[rows])
             plot_axes(x_eV=x_eV)
+            if type(savefig) is str:
+                save_path=savefig
+                if os.path.exists(save_path) is False:
+                    os.makedirs(save_path)
+                plt.savefig(rf'{save_path}\spec.png', dpi=300, transparent=True)
+            if savefig is True:
+                save_path = rf'{self.folder}\ROI'
+                if os.path.exists(save_path) is False:
+                    os.makedirs(save_path)
+                plt.savefig(rf'{save_path}\spec.png', dpi=300, transparent=True)
             if plot:
                 plt.show()
         if rois is not None:
             if type(rois) is not dict:
                 r = roi_masks(self.stack, rois)
-            if 'img_mask' not in rois[list(rois.keys())[0]]:
-                r = roi_masks(self.stack, rois)
+            #if 'img_mask' not in rois[list(rois.keys())[0]]:
+            #    r = roi_masks(self.stack, rois)
             else:
                 r = rois
             color = cm.rainbow(np.linspace(0,1,len(r)))
@@ -813,10 +845,24 @@ class data:
             rgba[masks==-1,:] = [1,1,1,1]
             plot_axes(x_eV=x_eV)
             plt.legend()
+            if type(savefig) is str:
+                    save_path=savefig
+                    if os.path.exists(save_path) is False:
+                        os.makedirs(save_path)
+                    plt.savefig(rf'{save_path}\spec.png', dpi=300, transparent=True)
+            if savefig is True:
+                save_path = rf'{self.folder}\ROI'
+                if os.path.exists(save_path) is False:
+                    os.makedirs(save_path)
+                plt.savefig(rf'{save_path}\spec.png', dpi=300, transparent=True)
             if plot:
                 plt.show()
-                #n=len(r)+1
                 plt.imshow(rgba)
+                if type(savefig) is str:
+                    save_path=savefig
+                    plt.savefig(rf'{save_path}\masks.png', dpi=300, transparent=True)
+                if savefig is True:
+                    plt.savefig(rf'{save_path}\masks.png', dpi=300, transparent=True)
     def plot_zpro(self, x_eV=True):
         plt.plot(self.eV, zpro(self.stack))
         plot_axes(x_eV=x_eV)
@@ -870,7 +916,18 @@ class data:
                    resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'unit': 'um', 'axes':'YX'})
         labels = []
         for i,page in enumerate(self.stack_meta):
-            labels.append(rf'TLD_Mirror{i+1}_'+str(self.stack_meta[page]['TLD']['Mirror'])+'.tif')
+            if 'Helios' in self.stack_meta['img1']['System']['SystemType']:
+                mv_val = self.stack_meta[page]['TLD']['Mirror']
+            if 'Nova' in self.stack_meta['img1']['System']['SystemType']:
+                def_val = self.stack_meta[page]['TLD']['Deflector']
+                eV_val = def_val*(1/2.84)
+                csv_file_path = calib_file(self.folder)
+                if csv_file_path == 'no calibration file':
+                    coeffs = np.array((-0.39866667, 6))
+                else:
+                    coeffs = np.loadtxt(csv_file_path)
+                mv_val = (eV_val - coeffs[1])/coeffs[0]
+            labels.append(rf'TLD_Mirror{i+1}_'+str(mv_val)+'.tif')
         tf.imwrite(rf'{save_path}\{self.name}_stack.tif',
                    self.stack, dtype=self.dtype_info.dtype, photometric='minisblack', imagej=True,
                    resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'spacing':1, 'unit': 'um', 'axes':'ZYX', 'Labels':labels}) #make numpy array into multi page OME-TIF format (Bio - formats)
