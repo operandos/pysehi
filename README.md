@@ -25,11 +25,16 @@ The file tree required by `process_data` is *...\Raw\material\YYMMDD\data_folder
 Functions `list_files` and `load` and the `data` class also require the folder (raw or processed) to be in the format *...\{Raw or Processed}\material\\...\YYMMDD\\...\data_folder*.  
 Any number of sub-classes can be provided after 'material' and after 'YYMMDD' in the data folder path eg. *...\Raw\material_class\material_subclass\material_condition\YYMMDD\experiment_1\data_folder*.  
 
-## Outputs of `process_files`
+## Functions
+### `process_files`
 **stack.tif** - Registered and cropped image stack. The SEHI data volume. Scale and slice label metadata compatible with FIJI (ImageJ).  
 **avg_img.tif** - Average image of SEHI data volume along energy axis. Scale metadata compatible with FIJI (ImageJ).  
 **avg_img_scaled.png** - Normalised average image with scalebar saved at 400 dpi.  
 **stack_meta.json** - Dictionary structure of FEI/ThermoScientific image metadata for each slice in the SEHI data volume.  
+### `load`
+Provide a path to the data files to load as a pysehi object.
+### `load().plot_spec`
+Plot a spectrum from the whole field of view or from a region of interest if an imagJ roi file or mask array is provided.
 
 ## Citation
 Please cite use of the pysehi functions and processing scripts by refering to the most recent pysehi release hosted at 10.15131/shef.data.21647084
