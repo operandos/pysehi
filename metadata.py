@@ -7,8 +7,11 @@ Created on Thu Jan 12 14:12:09 2023
 
 from deepdiff import DeepDiff
 from engineering_notation import EngNumber
+import csv
 
-def metadata_params(stack_meta=None, name=None, parameter=None, parameter_false=None,readable=True):
+def metadata_params(data=None, parameter=None, parameter_false=None,readable=True, write=False):
+    stack_meta = data.stack_meta
+    name=rf"{data.date}_{data.name}"
     params=[]
     if type(parameter) is str:
         params.append(parameter)
@@ -18,27 +21,39 @@ def metadata_params(stack_meta=None, name=None, parameter=None, parameter_false=
     if type(parameter_false) is str:
         params_false.append(parameter_false)
     if 'stage' in params_false:
-        params_false.extend(['r','x','y','z'])
+        params_false.extend(['r','t','x','y','z'])
         params_false.remove('stage')
     if type(parameter_false) is list:
         params_false=parameter_false
-    prop_list = ['curr','accel','uc','dwell','wd','r','x','y','z','hfw','px','py','average','integrate','interlacing','cntr','brtn','step', 'range']
+    prop_list = ['curr','accel','uc','dwell','wd','r','t','x','y','z','hfw','px','py','average','integrate','interlacing','cntr','brtn']#,'step', 'range']
     if parameter is None:
         params=prop_list
     if type(params_false) is list:
         for prop_f in params_false:
             if any(prop_f in p for p in params):
                 params.remove(prop_f)
+    if write is True:
+        with open(rf"{data.folder.replace('Raw','Processed')}\Metadata\{data.name}_stack_meta_readable.txt", "a") as f:
+            f.write(f'{name.center(42)}\n')
+            f.write('_'*42)
+            f.write('\n')
+            f.write('{:<15s} {:<15s} {:<15s}'.format('parameter','value','unit'))
+            f.write('\n')
+            f.write('_'*42)
+            f.write('\n')
     if readable is True:
-        if name is not None:
-            print('\n',rf'{name.center(42)}')
+        print('\n',rf'{name.center(42)}')
         print('_'*42)
         print('{:<15s} {:<15s} {:<15s}'.format('parameter','value','unit'))
         print('_'*42)
+    if write is True:
+        rows=[]
     if stack_meta is None:
         keys={}
+    i=1
     for prop in params:
         if any(prop in p for p in prop_list):
+            i+=1
             if prop == 'curr':
                 k,unit = ['EBeam','BeamCurrent'], 'A'
             if prop == 'accel':
@@ -65,6 +80,8 @@ def metadata_params(stack_meta=None, name=None, parameter=None, parameter_false=
                 k,unit = ['TLD','Mirror'], 'V'
             if prop == "r":
                 k,unit = ['Stage','StageR'], 'rad'
+            if prop == "t":
+                k,unit = ['Stage','StageT'], 'rad'
             if prop == "brtn":
                 k,unit = ['TLD','Brightness'], '%'
             if prop == "cntr":
@@ -82,14 +99,21 @@ def metadata_params(stack_meta=None, name=None, parameter=None, parameter_false=
                     value = value.get(key)
                     if not value:
                         break
+                if type(value) is float or type(value) is int: 
+                    v=str(EngNumber(value))
+                else:
+                    v=value
+                if write:
+                    with open(rf"{data.folder.replace('Raw','Processed')}\Metadata\{data.name}_stack_meta_readable.txt", "a") as f:
+                        f.write(str('{:<15s} {:<15s} {:<15s}'.format(key,v,unit)))
+                        f.write('\n')
                 if readable:
-                    if len(unit)>0:
-                        print('{:<15s} {:<15s} {:<15s}'.format(prop,rf'{EngNumber(value)}',unit))
-                    if len(unit)==0:
-                        print('{:<15s} {:<15s}'.format(prop,value))
+                    print('{:<15s} {:<15s} {:<15s}'.format(prop,v,unit))
                 if readable is False:
                     if parameter is not None:
                         return k, value
+    if write:
+        f.close()
     if stack_meta is None:
         return keys
 
