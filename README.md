@@ -6,18 +6,18 @@
 
 ## Get started
 ### Branch or download the code
-Unzip it in a new pysehi directory.
+Unpack it in a new pysehi directory.
 ### Create a pysehi environment
 Once [miniconda](https://docs.conda.io/en/latest/miniconda.html#latest-miniconda-installer-links) is installed, open the terminal and use the [pysehi_manual_build.yml](https://github.com/operandos/pysehi/blob/main/pysehi_manual_build.yml) file to make a pysehi environment.  
 In the terminal: 
  1) ```cd ...\path-to\pysehi-dir```
+  **note** - if pysehi is in a different drive (eg. *G:*) to the default (eg. *C:*), switch drive by running `g:` and then do (2)
  2) ```conda env create --name pysehi --file pysehi_manual_build.yml```
 ### Activate pysehi
 In Anaconda Prompt run:
   1) `cd ...\path-to\pysehi`
-  1) `activate sehi`  
-  **note** - if pysehi is in a different drive (eg. *G:*) to the default (eg. *C:*), switch drive by running `g:` and then do (2)
-  4) `jupyter notebook` to run scripts, **or** `spyder` for the development environment
+  2) `activate sehi`
+  3) `jupyter notebook` to run scripts, **or** `spyder` for the development environment
 
 ## Compatible data file structure
 **pysehi functions will only work for data saved with a compatible file tree.**  
