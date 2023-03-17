@@ -17,7 +17,7 @@ In the terminal run:
 ### Activate pysehi
 In the terminal run:
   1) `cd ...\path-to\pysehi`
-  2) `activate sehi`
+  2) `conda activate pysehi`
   3) `jupyter notebook` to run scripts, **or** `spyder` for the development environment
 
 ## Compatible data file structure
