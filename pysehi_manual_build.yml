@@ -1,0 +1,28 @@
+name: pysehi
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - jupyter=1.0.0
+  - matplotlib
+  - natsort
+  - numpy
+  - opencv=4.6.0
+  - pandas
+  - pip
+  - pymatgen=2022.11.7
+  - python=3.10.6
+  -read-roi
+  - regex
+  - scikit-image
+  - scikit-learn
+  - scipy
+  - spyder
+  - tifffile
+  - xlsxwriter
+  - pip:
+    - deepdiff
+    - engineering-notation
+    - imutils
+    - matplotlib-scalebar
+    - pyvsnr
