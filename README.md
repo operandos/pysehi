@@ -9,6 +9,7 @@
 Unpack it in a new pysehi directory.
 ### Create a pysehi environment
 Once [miniconda](https://docs.conda.io/en/latest/miniconda.html#latest-miniconda-installer-links) is installed, open the terminal and use the [pysehi_manual_build.yml](https://github.com/operandos/pysehi/blob/main/pysehi_manual_build.yml) file to make a pysehi environment.  
+
 In the terminal: 
  1) ```cd ...\path-to\pysehi-dir```  
   **note** - if pysehi is in a different drive (eg. *G:*) to the default (eg. *C:*), switch drive by running `g:` and then do (1)
