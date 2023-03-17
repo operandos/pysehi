@@ -8,10 +8,10 @@
 ### Branch or download the code
 Unzip it in a new pysehi directory.
 ### Create a pysehi environment
-Create a pysehi environment and install the dependancies using [anaconda prompt](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file) and the [pysehi_env.yml](https://github.com/operandos/pysehi/blob/main/pysehi_env.yml):  
+Create a pysehi environment and install the dependancies using [anaconda prompt](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file) and the [pysehi_manual_build.yml](https://github.com/operandos/pysehi/blob/main/pysehi_manual_build.yml):  
 In Anaconda Prompt: 
- 1) cd ...\path-to\pysehi-dir
- 2) conda env create --name pysehi --file pysehi_env.yml 
+ 1) ```cd ...\path-to\pysehi-dir```
+ 2) ```conda env create --name pysehi --file pysehi_manual_build.yml```
 ### Activate pysehi
 In Anaconda Prompt run:
   1) `activate sehi`
