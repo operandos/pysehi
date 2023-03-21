@@ -12,7 +12,7 @@ dependencies:
   - pip
   - pymatgen=2022.11.7
   - python=3.10.6
-  -read-roi
+  - read-roi
   - regex
   - scikit-image
   - scikit-learn
