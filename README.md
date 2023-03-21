@@ -20,11 +20,11 @@ In the terminal run:
   2) `conda activate pysehi`
   3) `jupyter notebook` to run scripts, **or** `spyder` for the development environment
 
-## Compatible data file structure
-**pysehi functions will only work for data saved with a compatible file tree.**  
-The file tree required by `process_data` is *...\Raw\material\YYMMDD\data_folder*. The processsed data is then saved to a *Processed* location that mirrors the *Raw* data file tree.  
-Functions `list_files` and `load` and the `data` class also require the folder (raw or processed) to be in the format *...\{Raw or Processed}\material\\...\YYMMDD\\...\data_folder*.  
-Any number of sub-classes can be provided after 'material' and after 'YYMMDD' in the data folder path eg. *...\Raw\material_class\material_subclass\material_condition\YYMMDD\experiment_1\data_folder*.  
+## Citation
+Please cite **10.15131/shef.data.22310068** and the most recent release number when you have used pysehi. For example:  
+> *reference will be updated when the figshare has been reviewed*
+
+The packaged releases are hosted on FigShare at *link to published figshare when published*
 
 ## Functions
 ### `process_files`
@@ -38,5 +38,8 @@ Provide a path to the data files to load as a pysehi object.
 ### `load().plot_spec`
 Plot a spectrum from the whole field of view or from a region of interest if an imagJ roi file or mask array is provided.
 
-## Citation
-Please cite use of the pysehi functions and processing scripts by refering to the most recent pysehi release hosted at 10.15131/shef.data.21647084
+## Compatible data file structure
+**pysehi functions will only work for data saved with a compatible file tree.**  
+The file tree required by `process_data` is *...\Raw\material\YYMMDD\data_folder*. The processsed data is then saved to a *Processed* location that mirrors the *Raw* data file tree.  
+Functions `list_files` and `load` and the `data` class also require the folder (raw or processed) to be in the format *...\{Raw or Processed}\material\\...\YYMMDD\\...\data_folder*.  
+Any number of sub-classes can be provided after 'material' and after 'YYMMDD' in the data folder path eg. *...\Raw\material_class\material_subclass\material_condition\YYMMDD\experiment_1\data_folder*.  
