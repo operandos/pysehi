@@ -22,7 +22,7 @@ In the terminal run:
 
 ## Citation
 Please cite **https://doi.org/10.15131/shef.data.22310068.v1** and the most recent release tag when you have used pysehi. For example:  
-> Nohl, James (2023), pysehi releases, The University of Sheffield, Software, https://doi.org/10.15131/shef.data.22310068.v1, version 1.1.1
+> Nohl, James F. (2023), pysehi releases version 1.1.1, The University of Sheffield, Software, https://doi.org/10.15131/shef.data.22310068.v1
 
 The packaged releases are hosted on FigShare at *link to published figshare when published*
 
