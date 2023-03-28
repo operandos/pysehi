@@ -21,7 +21,7 @@ In the terminal run:
   3) `jupyter notebook` to run scripts, **or** `spyder` for the development environment
 
 ## Citation
-Please cite **10.15131/shef.data.22310068** and the most recent release number when you have used pysehi. For example:  
+Please cite **(https://doi.org/10.15131/shef.data.22310068.v1)** and the most recent release number when you have used pysehi. For example:  
 > *reference will be updated when the figshare has been reviewed*
 
 The packaged releases are hosted on FigShare at *link to published figshare when published*
