@@ -24,7 +24,7 @@ In the terminal run:
 Please cite **https://doi.org/10.15131/shef.data.22310068.v1** and the most recent release tag when you have used pysehi. For example:  
 > Nohl, James F. (2023), pysehi releases version 1.1.1, The University of Sheffield, Software, https://doi.org/10.15131/shef.data.22310068.v1
 
-The packaged releases are hosted on FigShare at *link to published figshare when published*
+The packaged releases are hosted on Figshare at https://figshare.shef.ac.uk/articles/software/pysehi_releases/22310068.
 
 ## Functions
 ### `process_files`
