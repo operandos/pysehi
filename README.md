@@ -12,7 +12,7 @@ Once [miniconda](https://docs.conda.io/en/latest/miniconda.html#latest-miniconda
 
 In the terminal run: 
  1) ```cd ...\path-to\pysehi-project```  
-  > **note** - **for Windows users** if pysehi is in a different drive (eg. *G:*) to the default (eg. *C:*), switch drive by running `g:` and then do (1)
+  > **Note** - **for Windows users** if pysehi is in a different drive (eg. *G:*) to the default (eg. *C:*), switch drive by running `g:` and then do (1)
  2) ```conda env create --name pysehi --file pysehi_manual_build.yml```
 ### Activate pysehi
 In the terminal run:
