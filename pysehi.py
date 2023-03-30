@@ -27,14 +27,21 @@ from skimage import img_as_float
 import read_roi
 import output
 import metadata
+import pathlib
 
 def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None, register=True, custom_name=None, overview_img:str=None):
     if type(files) is str:
-        if regex.search("(\d{6})|(\d*-[\d-]*\d)", files) is None:
+        files_pl=pathlib.Path(files)
+        for part in files_pl.parts:
+            init_date = regex.search("(\d{6})|(\d*-[\d-]*\d)", part)
+            if init_date is not None:
+                init_date=init_date.group(0)
+                break
+        if init_date is None:
             print(r"Date missing!    Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
-        elif not 'Raw' in files:
+        elif not 'Raw' in files_pl.parts:
             print(r"Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
-        elif 'Raw' in files in files:
+        elif 'Raw' in files_pl.parts:
             data_files = list_files(files, condition_true, condition_false, custom_name=custom_name)
         else:
             print(r"Input a path to raw files in the format '...\Raw\material\...\YYMMDD\...\data_folder')")
@@ -48,20 +55,22 @@ def process_files(files:str or dict, AC:bool=True, condition_true:list=None, con
             if '_R' not in root:
                 print(rf'loading.....................{root}')
                 data_files[name]['Processed_path'] = root.replace('Raw','Processed')
-                data(root, AC=AC, reg=register).save_data(reg=register)
-                data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
-                metadata.metadata_params(data(root),write=True)
-                print(rf'processed!..................{root}')
+                dat = data(root, AC=AC, reg=register)
+                dat.save_data(reg=register)
+                data_files[name]['stack_meta'] = dat.stack_meta
+                metadata.metadata_params(dat,write=True)
+                print(rf"processed!..................{root.replace('Raw','Processed')}")
             if '_R' in root:
                 if AC is False:
                     print(rf'loading.....................{root}')
                     data_files[name]['Processed_path'] = root.replace('Raw','Processed')
-                    data(root, AC=AC, reg=register).save_data(reg=register)
-                    data_files[name]['stack_meta'] = data(root,AC=AC).stack_meta
-                    metadata.metadata_params(data(root),write=True)
+                    dat = data(root, AC=AC, reg=register)
+                    dat.save_data(reg=register)
+                    data_files[name]['stack_meta'] = dat.stack_meta
+                    metadata.metadata_params(dat,write=True)
                     print(rf"processed!..................{root.replace('Raw','Processed')}")
-                #if AC is True:
-                #    print(rf'AC is True, discounted......{root}')
+                if AC is True:
+                    print(rf'AC is True, discounted......{root}')
     data_pro_path = files.replace('Raw','Processed')
     output.summary_excel(data_pro_path, condition_true, condition_false)
     if overview_img is not None:
@@ -97,8 +106,11 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
             if date is not None:
                 if not str(date) in root:
                     continue
-            if date is None:
-                date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
+            for part in pathlib.Path(root).parts:
+                date = regex.search("(\d{6})|(\d*-[\d-]*\d)", part)
+                if date is not None:
+                    date=date.group(0)
+                    break
             if condition_true is not None:
                 if not any(c in root for c in condition_true):
                     continue
@@ -112,11 +124,16 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
                     file_str = 'TLD_Mirror'
                 if any('Log.csv' in file for file in file_list) or any(file_str in file for file in file_list):
                     name = os.path.split(root)[1]
-                    #date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
                     if root.find(date)>root.find('Raw'):
-                        material = root.split(rf'\{date}')[0].split('Raw\\')[1]
+                        if type(pathlib.Path(root)) is pathlib.WindowsPath:
+                            material = root.split(rf'\{date}')[0].split('Raw\\')[1]
+                        else:
+                            material = root.split(rf'/{date}')[0].split('Raw/')[1]
                     if root.find(date)<root.find('Raw'):
-                        material = root.split('Reference data\\')[1].split('\\')[0]
+                        if type(pathlib.Path(root)) is pathlib.WindowsPath:
+                            material = root.split('Reference data\\')[1].split('\\')[0]
+                        else:
+                            material = root.split('Reference data/')[1].split('/')[0]
                     data_files[rf'{date}_{name}']={}
                     data_files[rf'{date}_{name}']['Date'] = date
                     data_files[rf'{date}_{name}']['Material'] = material
@@ -124,11 +141,16 @@ def list_files(path_to_files, date:int=None, condition_true:list=None, condition
             if 'Processed' in path_to_files:
                 if any('stack' in file for file in file_list) and not any(f in root for f in ['Metadata','Colour','colour','ROI']):
                     name = os.path.split(root)[1]
-                    #date = regex.search("(\d{6})|(\d*-[\d-]*\d)", root).group(0)
                     if root.find(date)>root.find('Processed'):
-                        material = root.split(rf'\{date}')[0].split('Processed\\')[1]
+                        if type(pathlib.Path(root)) is pathlib.WindowsPath:
+                            material = root.split(rf'\{date}')[0].split('Processed\\')[1]
+                        else:
+                            material = root.split(rf'/{date}')[0].split('Processed/')[1]
                     if root.find(date)<root.find('Processed'):
-                        material = root.split('Reference data\\')[1].split('\\')[0]
+                        if type(pathlib.Path(root)) is pathlib.WindowsPath:
+                            material = root.split('Reference data\\')[1].split('\\')[0]
+                        else:
+                            material = root.split('Reference data/')[1].split('/')[0]
                     data_files[rf'{date}_{name}']={}
                     data_files[rf'{date}_{name}']['Date'] = date
                     data_files[rf'{date}_{name}']['Material'] = material
@@ -177,10 +199,11 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
         numpy array (float64) of coefficients for energy conversion from MV
 
     """
+    slash = slash_type(folder)
     name = os.path.split(folder)[1]
-    if 'Processed' in folder and os.path.exists(rf'{folder}\Metadata'):
+    if 'Processed' in folder and os.path.exists(rf'{folder}{slash}Metadata'):
         processed = True
-        stacks = glob.glob(rf'{folder}\*stack*.tif')
+        stacks = glob.glob(rf'{folder}{slash}*stack*.tif')
         if len(stacks) == 1:
             stack_file = stacks[0]
             stack = tf.imread(stack_file)
@@ -196,9 +219,9 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
         if uint8 is True:
             stack = img_as_ubyte(stack)
         dtype_info = np.iinfo(stack.dtype)
-        stack_meta_files = glob.glob(rf'{folder}\Metadata\*stack_meta*.json')
+        stack_meta_files = glob.glob(rf'{folder}{slash}Metadata{slash}*stack_meta*.json')
         if len(stack_meta_files)==0 and '_AC' in os.path.split(folder)[1]:
-            stack_meta_files = glob.glob(rf'{folder.split("_AC")[0]}\Metadata\*stack_meta*.json')
+            stack_meta_files = glob.glob(rf'{folder.split("_AC")[0]}{slash}Metadata{slash}*stack_meta*.json')
             with open(stack_meta_files[0]) as file:
                 stack_meta = json.load(file)
             file.close()
@@ -218,7 +241,7 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
                     ana_voltage.append(stack_meta[page]['TLD']['Deflector'])
             else:
                 print('Warning, no Deflector in stack_meta, searching raw data for Log.csv')
-                ana_voltage = np.loadtxt(rf"{folder.replace('Processed','Raw')}\Log.csv",delimiter=',', skiprows=2)[:,1]
+                ana_voltage = np.loadtxt(rf"{folder.replace('Processed','Raw')}{slash}Log.csv",delimiter=',', skiprows=2)[:,1]
         if sys==True:
             if calib is None:
                 csv_file_path = calib_file(folder)
@@ -236,7 +259,7 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
     if 'Raw' in folder:
         processed = False
         stack_filename = rf'{name}_stack'
-        files = glob.glob(rf'{folder}\*.tif')
+        files = glob.glob(rf'{folder}{slash}*.tif')
         ana_voltage = []
         for file in files:
             metadata = load_single_file(file, load_img = False)
@@ -247,7 +270,7 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
         if 'Nova' in metadata['System']['SystemType']:
             sys = False
             analyser = 'Deflector'
-            ana_voltage = np.loadtxt(rf'{folder}\Log.csv',delimiter=',', skiprows=2)[:,1]
+            ana_voltage = np.loadtxt(rf'{folder}{slash}Log.csv',delimiter=',', skiprows=2)[:,1]
             files.sort(key=lambda f: int(''.join(filter(str.isdigit, f) or -1)))
             files_sorted = files
         if sys == True:
@@ -318,6 +341,13 @@ def load_single_file(file, load_img = True):
         return img, metadata
     else:
         return metadata
+
+def slash_type(path):
+    if type(pathlib.Path(path)) is pathlib.WindowsPath:
+        slash = '\\'
+    else:
+        slash = '/'
+    return slash
 
 def sys_type(metadata):
     """
@@ -400,9 +430,10 @@ def MV(stack_meta):
     return MV
 
 def calib_file(path, filename=None):
+    slash = slash_type(path)
     if filename is None:
         filename = 'calibration.csv'
-    while os.path.exists(rf'{os.path.split(path)[0]}\{filename}') is False:
+    while os.path.exists(rf'{os.path.split(path)[0]}{slash}{filename}') is False:
         path = os.path.split(path)[0]
         if len(path) < 6:
             abort=True
@@ -410,7 +441,7 @@ def calib_file(path, filename=None):
             break
     #if abort is True:
         #return 'no calibration file'
-    return rf'{os.path.split(path)[0]}\{filename}'
+    return rf'{os.path.split(path)[0]}{slash}{filename}'
 
 def conversion(stack_meta, factor, corr):
     eV = (np.array(MV(stack_meta))*factor)+corr
@@ -477,6 +508,10 @@ def spec_dose(stack_meta):
     Float
         Spectrum dose [Cm^-2]
     """
+    if 'User' in stack_meta:
+        img_meta = stack_meta
+        stack_meta = {}
+        stack_meta['img1'] = img_meta
     d_img_list = []
     for page in stack_meta:
         I_0 = stack_meta[page]['EBeam']['BeamCurrent']
@@ -489,8 +524,9 @@ def spec_dose(stack_meta):
         d_img = ((I_0*t_dwell*n_px*(n_average+n_integrate))/A)#/line_int
         d_img_list.append(d_img)
     d_spec = np.sum(d_img_list)
-    if 'angular_correction' in stack_meta[page]['Processing']:
-        d_spec = 2*d_spec
+    if 'Processing' in stack_meta[page]:
+        if 'angular_correction' in stack_meta[page]['Processing']:
+            d_spec = 2*d_spec
     return d_spec
 
 def norm(data, n_min=False):
@@ -596,7 +632,13 @@ def load_roi_file(path_to_roi_file):
 
 class data:
     def __init__(self, folder, AC=True, calib=None, reg=True, force_uint8=False):
-        self.date = regex.search("(\d{6})|(\d*-[\d-]*\d)", folder).group(0)
+        slash = slash_type(folder)
+        for part in pathlib.Path(folder).parts:
+            date = regex.search("(\d{6})|(\d*-[\d-]*\d)", part)
+            if date is not None:
+                date=date.group(0)
+                break
+        self.date = date
         if AC is True and 'Raw' in folder and os.path.exists(rf'{folder}_R'):
             stack,stack_meta,self.eV,self.dtype_info,name,coeffs,stack_filename = load(folder, calib=calib, register=reg, uint8=force_uint8)
             stack_r_file = rf'{folder}_R'
@@ -796,6 +838,7 @@ class data:
         if plot is True:
             plt.show()
     def plot_spec(self, rois=None, plot=True, x_eV=True, xlim=[-1,8], savefig=False):
+        slash = slash_type(self.folder)
         xlim=np.array(xlim)
         if x_eV is True:
             rows = np.where((self.eV>=xlim[0])&(self.eV<=xlim[1]))[0]
@@ -811,12 +854,12 @@ class data:
                 save_path=savefig
                 if os.path.exists(save_path) is False:
                     os.makedirs(save_path)
-                plt.savefig(rf'{save_path}\spec.png', dpi=300, transparent=True)
+                plt.savefig(rf'{save_path}{slash}spec.png', dpi=300, transparent=True)
             if savefig is True:
-                save_path = rf'{self.folder}\ROI'
+                save_path = rf'{self.folder}{slash}ROI'
                 if os.path.exists(save_path) is False:
                     os.makedirs(save_path)
-                plt.savefig(rf'{save_path}\spec.png', dpi=300, transparent=True)
+                plt.savefig(rf'{save_path}{slash}spec.png', dpi=300, transparent=True)
             if plot:
                 plt.show()
         if rois is not None:
@@ -845,24 +888,26 @@ class data:
             rgba[masks==-1,:] = [1,1,1,1]
             plot_axes(x_eV=x_eV)
             plt.legend()
+            
+            slash= slash_type(self.folder)
             if type(savefig) is str:
                     save_path=savefig
                     if os.path.exists(save_path) is False:
                         os.makedirs(save_path)
-                    plt.savefig(rf'{save_path}\spec.png', dpi=300, transparent=True)
+                    plt.savefig(rf'{save_path}{slash}spec.png', dpi=300, transparent=True)
             if savefig is True:
-                save_path = rf'{self.folder}\ROI'
+                save_path = rf'{self.folder}{slash}ROI'
                 if os.path.exists(save_path) is False:
                     os.makedirs(save_path)
-                plt.savefig(rf'{save_path}\spec.png', dpi=300, transparent=True)
+                plt.savefig(rf'{save_path}{slash}spec.png', dpi=300, transparent=True)
             if plot:
                 plt.show()
                 plt.imshow(rgba)
                 if type(savefig) is str:
                     save_path=savefig
-                    plt.savefig(rf'{save_path}\masks.png', dpi=300, transparent=True)
+                    plt.savefig(rf'{save_path}{slash}masks.png', dpi=300, transparent=True)
                 if savefig is True:
-                    plt.savefig(rf'{save_path}\masks.png', dpi=300, transparent=True)
+                    plt.savefig(rf'{save_path}{slash}masks.png', dpi=300, transparent=True)
     def plot_zpro(self, x_eV=True):
         plt.plot(self.eV, zpro(self.stack))
         plot_axes(x_eV=x_eV)
@@ -903,6 +948,7 @@ class data:
         if save_path is None:
             plt.show()
     def save_data(self, reg, save_path=None):
+        slash = slash_type(self.folder)
         if save_path is None:
             if 'Raw' in self.folder:
                 save_path = self.folder.replace('Raw','Processed')
@@ -911,7 +957,7 @@ class data:
         if os.path.exists(save_path) is False:
             os.makedirs(save_path)
         pixel_width_um = self.stack_meta['img1']['Scan']['PixelWidth']*1e6
-        tf.imwrite(rf"{save_path}\{self.name}_avg_img.tif",
+        tf.imwrite(rf"{save_path}{slash}{self.name}_avg_img.tif",
                    data=data.img_avg(self), dtype=self.dtype_info.dtype, photometric='minisblack', imagej=True, 
                    resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'unit': 'um', 'axes':'YX'})
         labels = []
@@ -928,18 +974,18 @@ class data:
                     coeffs = np.loadtxt(csv_file_path)
                 mv_val = (eV_val - coeffs[1])/coeffs[0]
             labels.append(rf'TLD_Mirror{i+1}_'+str(mv_val)+'.tif')
-        tf.imwrite(rf'{save_path}\{self.name}_stack.tif',
+        tf.imwrite(rf'{save_path}{slash}{self.name}_stack.tif',
                    self.stack, dtype=self.dtype_info.dtype, photometric='minisblack', imagej=True,
                    resolution=(1./pixel_width_um, 1./pixel_width_um), metadata={'spacing':1, 'unit': 'um', 'axes':'ZYX', 'Labels':labels}) #make numpy array into multi page OME-TIF format (Bio - formats)
         
-        if os.path.exists(rf'{save_path}\Metadata') is False:
-            os.makedirs(rf'{save_path}\Metadata')
-        with open(rf'{save_path}\Metadata\{self.name}_stack_meta.json', 'w') as f:
+        if os.path.exists(rf'{save_path}{slash}Metadata') is False:
+            os.makedirs(rf'{save_path}{slash}Metadata')
+        with open(rf'{save_path}{slash}Metadata{slash}{self.name}_stack_meta.json', 'w') as f:
             json.dump(self.stack_meta, f)
         f.close()
         if '_AC' in self.name:
-            with open(rf'{save_path}\Metadata\{self.name}_stack_meta_r.json', 'w') as f:
+            with open(rf'{save_path}{slash}Metadata{slash}{self.name}_stack_meta_r.json', 'w') as f:
                 json.dump(self.stack_meta_r, f)
             f.close()
-        data.plot_stack_meta(self, reg, save_path=rf'{save_path}\Metadata\{self.name}_stack_meta_plots.png')
-        plot_scalebar(data.img_avg(self), stack_meta=self.stack_meta, save_path=rf'{save_path}\{self.name}_avg_img_scaled.png')
+        data.plot_stack_meta(self, reg, save_path=rf'{save_path}{slash}Metadata{slash}{self.name}_stack_meta_plots.png')
+        plot_scalebar(data.img_avg(self), stack_meta=self.stack_meta, save_path=rf'{save_path}{slash}{self.name}_avg_img_scaled.png')

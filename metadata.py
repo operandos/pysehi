@@ -8,8 +8,11 @@ Created on Thu Jan 12 14:12:09 2023
 from deepdiff import DeepDiff
 from engineering_notation import EngNumber
 import csv
+import os
+import pathlib
 
 def metadata_params(data=None, parameter=None, parameter_false=None,readable=True, write=False):
+    slash = slash_type(data.folder)
     stack_meta = data.stack_meta
     name=rf"{data.date}_{data.name}"
     params=[]
@@ -33,7 +36,9 @@ def metadata_params(data=None, parameter=None, parameter_false=None,readable=Tru
             if any(prop_f in p for p in params):
                 params.remove(prop_f)
     if write is True:
-        with open(rf"{data.folder.replace('Raw','Processed')}\Metadata\{data.name}_stack_meta_readable.txt", "a") as f:
+        if not os.path.exists(rf"{data.folder.replace('Raw','Processed')}{slash}Metadata"):
+            os.makedirs(rf"{data.folder.replace('Raw','Processed')}{slash}Metadata")
+        with open(rf"{data.folder.replace('Raw','Processed')}{slash}Metadata{slash}{data.name}_stack_meta_readable.txt", "a") as f:
             f.write(f'{name.center(42)}\n')
             f.write('_'*42)
             f.write('\n')
@@ -104,7 +109,7 @@ def metadata_params(data=None, parameter=None, parameter_false=None,readable=Tru
                 else:
                     v=value
                 if write:
-                    with open(rf"{data.folder.replace('Raw','Processed')}\Metadata\{data.name}_stack_meta_readable.txt", "a") as f:
+                    with open(rf"{data.folder.replace('Raw','Processed')}{slash}Metadata{slash}{data.name}_stack_meta_readable.txt", "a") as f:
                         f.write(str('{:<15s} {:<15s} {:<15s}'.format(key,v,unit)))
                         f.write('\n')
                 if readable:
@@ -165,3 +170,10 @@ def wd_check(stack_meta, readable=True, distance=0.0040):
             print('\t\tWARNING !','\t\t', 'Working distance is \t', metadata_params(stack_meta, 'wd', readable=False)[1]*1000,' mm')
         if readable is False:
             return False
+
+def slash_type(path):
+    if type(pathlib.Path(path)) is pathlib.WindowsPath:
+        slash = '\\'
+    else:
+        slash = '/'
+    return slash

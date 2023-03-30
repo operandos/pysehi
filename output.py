@@ -19,6 +19,7 @@ from cv2 import TM_CCOEFF_NORMED
 from cv2 import minMaxLoc as min_max_loc
 import math
 import matplotlib.pyplot as plt
+import pathlib
 
 def summary_excel(path_to_files, date:int=None, condition_true:list=None, condition_false:list=None, custom_name=None):
     
@@ -29,18 +30,36 @@ def summary_excel(path_to_files, date:int=None, condition_true:list=None, condit
         paths.append(os.path.split(data[key]['Processed_path'])[0])
     folder_groups = list(set(paths))
     for fg in folder_groups:
+        slash = slash_type(fg)
         ### Initialise workbook ###
-        init_path = fg
-        init_date = regex.search("(\d{6})|(\d*-[\d-]*\d)", fg).group(0)
+        init_path = pathlib.Path(fg)
+        for part in init_path.parts:
+            init_date = regex.search("(\d{6})|(\d*-[\d-]*\d)", part)
+            if init_date is not None:
+                init_date=init_date.group(0)
+                break
         if fg.find(init_date)>fg.find('Processed'):
-            init_mat = fg.split(rf'\{init_date}')[0].split('Processed\\')[1].replace('\\','_')
+            if type(pathlib.Path(fg)) is pathlib.WindowsPath:
+                init_mat = fg.split(rf'\{init_date}')[0].split('Processed\\')[1].replace('\\','_')
+            else:
+                init_mat = fg.split(rf'/{init_date}')[0].split('Processed/')[1].replace('/','_')
         if fg.find(init_date)<fg.find('Processed'):
-            init_mat = fg.split('Reference data\\')[1].split('\\')[0]
-        if len(fg.split(f'{init_date}\\')) > 1:
-            init_exp = fg.split(f'{init_date}\\')[1].replace('\\','_')
-            workbook = xlsxwriter.Workbook(rf"{init_path}\{init_date}_{init_mat}_{init_exp}_specOut.xlsx")
+            if type(pathlib.Path(fg)) is pathlib.WindowsPath:
+                init_mat = fg.split('Reference data\\')[1].split('\\')[0]
+            else:
+                init_mat = fg.split('Reference data/')[1].split('/')[0]
+        if type(pathlib.Path(fg)) is pathlib.WindowsPath:
+            if len(fg.split(f'{init_date}\\')) > 1:
+                init_exp = fg.split(f'{init_date}\\')[1].replace('\\','_')
+                workbook = xlsxwriter.Workbook(rf"{init_path}\{init_date}_{init_mat}_{init_exp}_specOut.xlsx")
+            else:
+                workbook = xlsxwriter.Workbook(rf"{init_path}\{init_date}_{init_mat}_specOut.xlsx")
         else:
-            workbook = xlsxwriter.Workbook(rf"{init_path}\{init_date}_{init_mat}_specOut.xlsx")
+            if len(fg.split(f'{init_date}/')) > 1:
+                init_exp = fg.split(f'{init_date}/')[1].replace('/','_')
+                workbook = xlsxwriter.Workbook(rf"{init_path}/{init_date}_{init_mat}_{init_exp}_specOut.xlsx")
+            else:
+                workbook = xlsxwriter.Workbook(rf"{init_path}/{init_date}_{init_mat}_specOut.xlsx")
         worksheetSpec = workbook.add_worksheet('FOV_spec')
         #worksheetMeta = workbook.add_worksheet('Metadata')
         
@@ -95,16 +114,17 @@ def summary_excel(path_to_files, date:int=None, condition_true:list=None, condit
                 'values':       ['FOV_spec', 2, 2+colNoSpec, 203, 2+colNoSpec]
             })
             f_name = name.split(rf"{init_date}_")[1]
-            if os.path.exists(rf"{data[name]['Processed_path']}\{f_name}_avg_img_scaled.png"):
-                worksheetSpec.insert_image(row_num+3, 0+colNoSpec, rf"{data[name]['Processed_path']}\{f_name}_avg_img_scaled.png", {'x_scale':0.555, 'y_scale':0.555})
-            if os.path.exists(rf"{data[name]['Processed_path']}\Metadata\{f_name}_stack_meta_plots.png"):
-                worksheetSpec.insert_image(row_num+12, 0+colNoSpec, rf"{data[name]['Processed_path']}\Metadata\{f_name}_stack_meta_plots.png", {'x_scale':0.48, 'y_scale':0.48})
+            if os.path.exists(rf"{data[name]['Processed_path']}{slash}{f_name}_avg_img_scaled.png"):
+                worksheetSpec.insert_image(row_num+3, 0+colNoSpec, rf"{data[name]['Processed_path']}{slash}{f_name}_avg_img_scaled.png", {'x_scale':0.555, 'y_scale':0.555})
+            if os.path.exists(rf"{data[name]['Processed_path']}{slash}Metadata{slash}{f_name}_stack_meta_plots.png"):
+                worksheetSpec.insert_image(row_num+12, 0+colNoSpec, rf"{data[name]['Processed_path']}{slash}Metadata{slash}{f_name}_stack_meta_plots.png", {'x_scale':0.48, 'y_scale':0.48})
             countNo+=1
         worksheetSpec.insert_chart(0,4+colNoSpec, chartNorm)
         worksheetSpec.insert_chart(15,4+colNoSpec, chartIntensity)
         workbook.close()
 
 def location_mosaic(path_to_folder, path_to_img_overview=None, condition_false=None,path_to_img_template=None):
+    slash=slash_type(path_to_folder)
     loc_dict = {}
     if path_to_img_overview is not None:
         if '.tif' in path_to_img_overview:
@@ -185,7 +205,7 @@ def location_mosaic(path_to_folder, path_to_img_overview=None, condition_false=N
             plt.text(loc_dict[sub]['path'][:,0][0]*1e6,loc_dict[sub]['path'][:,1][0]*1e6,label, c=[189/255,195/255,199/255,1])
     plt.xlabel('x [\u03BCm]')
     plt.ylabel('y [\u03BCm]')
-    plt.savefig(rf'{path_to_folder}\locations_overview.png',dpi=400,transparent='True')
+    plt.savefig(rf'{path_to_folder}{slash}locations_overview.png',dpi=400,transparent='True')
     plt.show()
     
     ### handle case where the mosaic regions are aligned by template matching ###
@@ -249,3 +269,10 @@ def rotate(origin, point, angle):
     return qx, qy
 #def experimental_conditions(stack_meta):
     #so something to compare acquisitions and warn of variation
+    
+def slash_type(path):
+    if type(pathlib.Path(path)) is pathlib.WindowsPath:
+        slash = '\\'
+    else:
+        slash = '/'
+    return slash
