@@ -26,8 +26,11 @@ from skimage import img_as_ubyte
 from skimage import img_as_float
 import read_roi
 import output
+import smooth
 import metadata
 import pathlib
+import pandas as pd
+import collections
 
 def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None, register=True, custom_name=None, overview_img:str=None):
     if type(files) is str:
@@ -200,22 +203,31 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
 
     """
     slash = slash_type(folder)
-    name = os.path.split(folder)[1]
-    if 'Processed' in folder and os.path.exists(rf'{folder}{slash}Metadata'):
+    if 'Processed' in folder:
         processed = True
-        stacks = glob.glob(rf'{folder}{slash}*stack*.tif')
-        if len(stacks) == 1:
-            stack_file = stacks[0]
-            stack = tf.imread(stack_file)
-            stack_filename = os.path.split(stack_file)[1].split('.tif')[0]
-        #wildcards = ['_AC','_aligned','_corr']
+        if 'tif' in folder:
+            if os.path.exists(rf'{os.path.split(folder)[0]}{slash}Metadata'):
+                stack = tf.imread(folder)   
+                stack_file = folder
+                stack_filename = os.path.split(stack_file)[1].split('.tif')[0]
+                folder = os.path.split(folder)[0]
+                name = os.path.split(folder)[1]
         else:
-            for qual in ['_seg_1','_seg','_corr','aligned','_AC']:
-                matching = [s for s in stacks if qual in s]
-                if len(matching) == 1:
-                    stack = tf.imread(matching[0])
-                    stack_filename = os.path.split(matching[0])[1].split('.tif')[0]
-                    break
+            if os.path.exists(rf'{folder}{slash}Metadata'):
+                name = os.path.split(folder)[1]
+                stacks = glob.glob(rf'{folder}{slash}*stack*.tif')
+                if len(stacks) == 1:
+                    stack_file = stacks[0]
+                    stack = tf.imread(stack_file)
+                    stack_filename = os.path.split(stack_file)[1].split('.tif')[0]
+                #wildcards = ['_AC','_aligned','_corr']
+                else:
+                    for qual in ['_seg_1','_seg','_corr','aligned','_AC']:
+                        matching = [s for s in stacks if qual in s]
+                        if len(matching) == 1:
+                            stack = tf.imread(matching[0])
+                            stack_filename = os.path.split(matching[0])[1].split('.tif')[0]
+                            break
         if uint8 is True:
             stack = img_as_ubyte(stack)
         dtype_info = np.iinfo(stack.dtype)
@@ -257,22 +269,26 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
             eV = np.array((ana_voltage*coeffs))
         
     if 'Raw' in folder:
+        name = os.path.split(folder)[1]
         processed = False
         stack_filename = rf'{name}_stack'
         files = glob.glob(rf'{folder}{slash}*.tif')
+        metadata = load_single_file(files[0], load_img = False)
         ana_voltage = []
-        for file in files:
-            metadata = load_single_file(file, load_img = False)
-            if 'Helios' in metadata['System']['SystemType']:
+        if 'Helios' in metadata['System']['SystemType']:
+            for file in files:
+                metadata = load_single_file(file, load_img = False)
                 sys = True
                 analyser = 'Mirror'
                 ana_voltage.append(metadata['TLD']['Mirror'])
-        if 'Nova' in metadata['System']['SystemType']:
+        elif 'Nova' in metadata['System']['SystemType']:
             sys = False
             analyser = 'Deflector'
             ana_voltage = np.loadtxt(rf'{folder}{slash}Log.csv',delimiter=',', skiprows=2)[:,1]
             files.sort(key=lambda f: int(''.join(filter(str.isdigit, f) or -1)))
             files_sorted = files
+        else:
+            print('neither Nova or Helios data')
         if sys == True:
             files_sorted = [files for (ana_voltage,files) in sorted(zip(ana_voltage,files), key=lambda pair: pair[0], reverse=sys)]
             ana_voltage = []
@@ -282,7 +298,17 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
         stack_meta = {}
         ref_img = tf.imread(files_sorted[-1])
         dtype_info = np.iinfo(ref_img.dtype)
-        template,temp_path, area = template_crop(ref_img,y,x,hfw)
+        
+        if len(glob.glob(rf'{folder}{slash}*.roi')) == 1:
+            roi_file = glob.glob(rf'{folder}{slash}*.roi')[0]
+            roi_name = os.path.split(roi_file)[1].split('.')[0]
+            temp_roi = load_roi_file(roi_file)
+            template = ref_img[temp_roi[roi_name]['top']:temp_roi[roi_name]['top']+temp_roi[roi_name]['height'],
+                               temp_roi[roi_name]['left']:temp_roi[roi_name]['left']+temp_roi[roi_name]['width']]
+            temp_path = temp_roi[roi_name]['roi_path'][0]
+        else:
+            template,temp_path, area = template_crop(ref_img,y,x,hfw)
+        
         shift_list_1 = []
         for i,file in enumerate(files_sorted):
             i+=1 # for legacy reasons (img saved from TLD_Mirror1)
@@ -304,6 +330,11 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
             if sys == False:
                 stack_meta[f'img{i}']['TLD'][analyser] = ana_voltage[i-1]
         if register is True:
+            path_plot = np.concatenate((temp_path,[temp_path[0]]),axis=0)
+            plt.imshow(ref_img)
+            plt.plot(path_plot[:,0],path_plot[:,1],c='r')
+            plt.title("template match region")
+            plt.show()
             x_max, y_max = np.ceil(np.max(shift_list_1,axis=0))
             x_min, y_min = np.floor(np.min(shift_list_1,axis=0))
             if y_min > 0:
@@ -332,12 +363,15 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
             eV = np.array((ana_voltage*coeffs))
     return stack, stack_meta, eV, dtype_info, name, coeffs, stack_filename
 
-def load_single_file(file, load_img = True):
+def load_single_file(file, load_img=True, crop_footer=False):
     with tf.TiffFile(file) as tif:
         metadata = tif.fei_metadata
     tif.close()
     if load_img == True:
         img = tf.imread(file)
+        if crop_footer == True:
+            yc = metadata['Image']['ResolutionY']
+            img = img[:yc,:]
         return img, metadata
     else:
         return metadata
@@ -448,6 +482,22 @@ def conversion(stack_meta, factor, corr):
     return eV
 
 def plot_axes(norm=False, x_eV=True):
+    """
+    Generates axes labels for SE spectrum plot.
+
+    Parameters
+    ----------
+    norm : bool, optional
+        The y-label to plot. If True: "Emission intensity norm. [arb.u.]". If False: "Emission intensity [arb.u.].
+        The default is False.
+    x_eV : bool, optional
+        If True plots eV values. If False, plots MV values with inverted axis. The default is True.
+
+    Returns
+    -------
+    None.
+
+    """
     plt.rcParams['mathtext.fontset'] = 'custom'
     plt.rcParams['mathtext.it'] = 'sans:italic:bold'
     plt.rcParams['mathtext.bf'] = 'sans:bold'
@@ -545,6 +595,7 @@ def roi_masks(img, rois_data):
     if len(img.shape) == 2:
         img_r = img
         y,x = img.shape
+    
     if '.zip' in rois_data or '.roi' in rois_data:
         rois = load_roi_file(rois_data)
         for name in rois:
@@ -557,7 +608,21 @@ def roi_masks(img, rois_data):
                 mask = mask.reshape(y,x)                                    # reshape to the same size as the image
                 img_mask = np.ma.mask_or(img_mask,mask)                     # add the xycrop to the 2D mask
             rois[name]['img_mask'] = img_mask                           # add img mask to rois dict
-    if type(rois_data) is dict:
+    elif 'type' in rois_data:
+        rois={}
+        if 'img_mask' in rois_data:
+            rois[0] = rois_data
+        else:
+            ygrid, xgrid = np.mgrid[:y,:x]
+            xypix = np.vstack((xgrid.ravel(), ygrid.ravel())).T
+            img_mask = np.ma.getmask(np.ma.array(img_r, mask=False))
+            pth = Path(rois_data['roi_path'], closed=False)
+            mask = pth.contains_points(xypix)
+            mask = mask.reshape(y,x)
+            img_mask = np.ma.mask_or(img_mask,mask)
+            rois[0]={}
+            rois[0]['img_mask'] = img_mask
+    elif isinstance(rois_data, collections.abc.Mapping) is False:
         rois=rois_data
         for name in rois:
             ygrid, xgrid = np.mgrid[:y, :x]
@@ -568,7 +633,22 @@ def roi_masks(img, rois_data):
             mask = mask.reshape(y,x)
             img_mask = np.ma.mask_or(img_mask,mask)
             rois[name]['img_mask'] = img_mask
-    if '.npy' in rois_data:
+    elif isinstance(rois_data, collections.abc.Mapping) is True:
+        rois = rois_data
+        for name in rois:
+            if 'img_mask' in rois[name]:
+                continue
+            else:
+                ygrid, xgrid = np.mgrid[:y, :x]
+                xypix = np.vstack((xgrid.ravel(), ygrid.ravel())).T
+                img_mask = np.ma.getmask(np.ma.array(img_r, mask=False))
+                for key in rois[name]['roi_path']:
+                    pth = Path(rois[name]['roi_path'][key], closed=False)
+                    mask = pth.contains_points(xypix)
+                    mask = mask.reshape(y,x)
+                    img_mask = np.ma.mask_or(img_mask,mask)
+                rois[name]['img_mask'] = img_mask
+    elif '.npy' in rois_data:
         rois={}
         masks = np.load(rois_data)
         i=0
@@ -576,7 +656,7 @@ def roi_masks(img, rois_data):
             rois[i] = {}
             rois[i]['img_mask'] = np.where(masks==i,True,False)
             i+=1
-    if type(rois_data) is np.ndarray:
+    elif type(rois_data) is np.ndarray:
         rois={}
         ygrid, xgrid = np.mgrid[:y,:x]
         xypix = np.vstack((xgrid.ravel(), ygrid.ravel())).T
@@ -587,6 +667,8 @@ def roi_masks(img, rois_data):
         img_mask = np.ma.mask_or(img_mask,mask)
         rois[0]={}
         rois[0]['img_mask'] = img_mask
+    else:
+        rois=rois_data
     return rois
 
 def load_roi_file(path_to_roi_file):
@@ -627,6 +709,9 @@ def load_roi_file(path_to_roi_file):
             xc = np.array(r[name]['x'])
             yc = np.array(r[name]['y'])
             xy_crop[0] = np.vstack((xc, yc)).T
+        if r[name]['type'] == 'oval':
+            rad = r[name]['width']/2
+            centre = np.array([r[name]['left']+rad, r[name]['top']+rad])
         r[name]['roi_path'] = xy_crop
     return r
 
@@ -780,18 +865,32 @@ class data:
         return rows
     def mv(self):
         return MV(self.stack_meta)
-    def spec(self, rois = None):
+    def spec(self, rois = None, pixel_spec:int = None):
         if rois is not None:
-            if type(rois) is not dict:
+            if pixel_spec is None:
                 r = roi_masks(self.stack, rois)
-            elif 'img_mask' not in rois[list(rois.keys())[0]]:
-                r = roi_masks(self.stack, rois)
-            else:
-                r = rois
+            if pixel_spec is not None:
+                r = roi_masks(smooth.uniform(self.stack, size=pixel_spec), rois)
             for name in r:
                 stack_mask = np.array([r[name]['img_mask']]*self.shape[0])
-                stack_masked = np.ma.masked_array(self.stack, ~stack_mask)
-                r[name]['spec'] = np.gradient(zpro(stack_masked))
+                if pixel_spec is None:
+                    stack_masked = np.ma.masked_array(self.stack, ~stack_mask)
+                    r[name]['spec'] = np.gradient(zpro(stack_masked))
+                if pixel_spec is not None:
+                    stack_masked = np.ma.masked_array(smooth.uniform(self.stack, size=pixel_spec), ~stack_mask)
+                    r[name]['spec_pix'] = pd.DataFrame()
+                    x_min = np.min(r[name]['roi_path'][0][:,0])
+                    x_max = np.max(r[name]['roi_path'][0][:,0])
+                    y_min = np.min(r[name]['roi_path'][0][:,1])
+                    y_max = np.max(r[name]['roi_path'][0][:,1])
+                    for yi in range(y_min,y_max,1):
+                        for xi in range(x_min,x_max,1):
+                            zpro_pix = stack_masked[:,yi,xi]#, dtype='float64')
+                            spec_pix = np.gradient(zpro_pix)
+                            r[name]['spec_pix'][f'x{xi},y{yi}'] = spec_pix
+                    r[name]['spec_avg'] = r[name]['spec_pix'].mean(axis=1)
+                    r[name]['spec_sd'] =  r[name]['spec_pix'].std(axis=1)
+                    r[name]['pixel_spec_width'] = pixel_spec
             return r
         else:
             spec = np.gradient(zpro(self.stack))
@@ -837,7 +936,35 @@ class data:
             plt.axis('off')
         if plot is True:
             plt.show()
-    def plot_spec(self, rois=None, plot=True, x_eV=True, xlim=[-1,8], savefig=False):
+    def plot_spec(self, rois=None, groups:dict=None, plot=True, x_eV=True, xlim=[-1,8], pixel_spec:int=None,
+                  smooth_width:int=None, savefig=False):
+        """
+        
+
+        Parameters
+        ----------
+        rois : TYPE, optional
+            DESCRIPTION. The default is None.
+        groups : dict, optional
+            DESCRIPTION. The default is None.
+        plot : TYPE, optional
+            DESCRIPTION. The default is True.
+        x_eV : TYPE, optional
+            DESCRIPTION. The default is True.
+        xlim : TYPE, optional
+            DESCRIPTION. The default is [-1,8].
+        pixel_spec : int, optional
+            DESCRIPTION. The default is None.
+        smooth_width : int, optional
+            DESCRIPTION. The default is None.
+        savefig : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        None.
+
+        """
         slash = slash_type(self.folder)
         xlim=np.array(xlim)
         if x_eV is True:
@@ -845,10 +972,14 @@ class data:
         if x_eV is False:
             rows = np.where((MV(self.stack_meta)>=xlim[0])&(MV(self.stack_meta)<=xlim[1]))[0]
         if rois is None:
+            if smooth_width is None:
+                y = data.spec(self)
+            else:
+                y = smooth.mov_av(data.spec(self), smooth_width)
             if x_eV is True:
-                plt.plot(self.eV[rows], data.spec(self)[rows])
+                plt.plot(self.eV[rows], y[rows])
             if x_eV is False:
-                plt.plot(MV(self.stack_meta)[rows], data.spec(self)[rows])
+                plt.plot(MV(self.stack_meta)[rows], y[rows])
             plot_axes(x_eV=x_eV)
             if type(savefig) is str:
                 save_path=savefig
@@ -862,30 +993,72 @@ class data:
                 plt.savefig(rf'{save_path}{slash}spec.png', dpi=300, transparent=True)
             if plot:
                 plt.show()
-        if rois is not None:
-            if type(rois) is not dict:
-                r = roi_masks(self.stack, rois)
-            #if 'img_mask' not in rois[list(rois.keys())[0]]:
-            #    r = roi_masks(self.stack, rois)
             else:
-                r = rois
+                plt.close()
+        if rois is not None:
+            if pixel_spec is None:
+                r = roi_masks(self.stack, rois)
+            else:
+                r = self.spec(rois, pixel_spec)
             color = cm.rainbow(np.linspace(0,1,len(r)))
             masks=np.empty(self.shape[1:3])
+            if type(groups) is dict:
+                groups_df = {}
+                for k in groups:
+                    groups_df[k] = pd.DataFrame()
             for i, (name,c) in enumerate(zip(r,color)):
                 if not 'spec' in r[name]:
-                    r[name]['spec'] = data.spec(self, rois)[name]['spec']
-                if x_eV is True:
-                    plt.plot(self.eV[rows], data.spec(self, rois)[name]['spec'][rows], c=c, label=name)
-                if x_eV is False:
-                    plt.plot(MV(self.stack_meta)[rows], data.spec(self, rois)[name]['spec'][rows], c=c, label=name)
+                    r[name]['spec'] = data.spec(self, r[name])[0]['spec']
+                if type(groups) is dict:
+                    for k in groups:
+                        if i+1 in groups[k]:
+                            groups_df[k][i+1] = r[name]['spec']
+                if smooth_width is None:
+                    y = r[name]['spec']
+                else:
+                    y = smooth.mov_av(r[name]['spec'], smooth_width)
+                if x_eV is True and groups is None and pixel_spec is None:
+                    plt.plot(self.eV[rows], y[rows], c=c, label=name)
+                if x_eV is False and groups is None and pixel_spec is None:
+                    plt.plot(MV(self.stack_meta)[rows], y[rows], c=c, label=name)
                 img_mask = np.where(r[name]['img_mask']==True,i+1,0)
                 masks = masks+img_mask
+            
+            if groups is not None:
+                for k in groups_df:
+                    groups_df[k]['mean'] = groups_df[k].mean(axis=1)
+                    groups_df[k]['std']  = groups_df[k].iloc[:,:-1].std(axis=1)
+                    if smooth_width is None:
+                        y   = groups_df[k]['mean']
+                        std = groups_df[k]['std']
+                    else:
+                        y   = smooth.mov_av(groups_df[k]['mean'], smooth_width)
+                        std = smooth.mov_av(groups_df[k]['std'], smooth_width)
+                    if x_eV is True:
+                        plt.plot(self.eV[rows], y[rows], label=k)
+                        plt.fill_between(self.eV[rows],y[rows]-std[rows],
+                                         y[rows]+std[rows], alpha=0.5)
+                    if x_eV is False:
+                        plt.plot(MV(self.stack_meta)[rows], y[rows], label=k)
+                        plt.fill_between(MV(self.stack_meta)[rows],y[rows]-std[rows], y[rows]+std[rows], alpha=0.5)
+                    
+            if pixel_spec is not None:
+                for name in r:
+                    if smooth_width is None:
+                        y   = r[name]['spec_avg']
+                        sd = r[name]['spec_sd']
+                    else:
+                        y   = smooth.mov_av(r[name]['spec_avg'], smooth_width)
+                        sd = smooth.mov_av(r[name]['spec_sd'], smooth_width)
+                    plt.plot(self.eV[rows] ,y[rows], c=c, label=name)
+                    plt.fill_between(self.eV[rows], y[rows]+sd[rows], y[rows]-sd[rows], color=c, alpha=0.5)
+                    
             masks = masks-1
             norm = colors.Normalize(vmin=0, vmax=len(r))
             cmap = plt.get_cmap('rainbow')
             masks_n = norm(masks)
             rgba = cmap(masks_n)
-            rgba[masks==-1,:] = [1,1,1,1]
+            rgba[masks==-1,:] = [1,1,1,0]
             plot_axes(x_eV=x_eV)
             plt.legend()
             
@@ -908,6 +1081,7 @@ class data:
                     plt.savefig(rf'{save_path}{slash}masks.png', dpi=300, transparent=True)
                 if savefig is True:
                     plt.savefig(rf'{save_path}{slash}masks.png', dpi=300, transparent=True)
+    
     def plot_zpro(self, x_eV=True):
         plt.plot(self.eV, zpro(self.stack))
         plot_axes(x_eV=x_eV)
