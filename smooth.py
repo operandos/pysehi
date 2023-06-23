@@ -41,3 +41,8 @@ def uniform(stack,size=3):
         return stack_UF
     else:
         print('stack is not image stack')
+
+def mov_av(y, width):
+    box = np.ones(width)/width
+    y_smooth = np.convolve(y, box, mode='same')
+    return y_smooth
