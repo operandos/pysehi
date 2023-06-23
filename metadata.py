@@ -145,14 +145,14 @@ def compare_params(meta_1, meta_2, readable=True, condition_true:list=None):
         """
     return diff
     
-def wd_check(stack_meta, readable=True, distance=0.0040):
+def wd_check(data, readable=True, distance=0.0040):
     """
     check that the working distance is 4.0 mm
     
     Parameters
     ----------
-    stack_meta : dict
-        dict of stack metadata.
+    data : object
+        data object of pysehi module.
     readable : bool, optional
         If readable is True, print result. The default is True.
 
@@ -162,12 +162,12 @@ def wd_check(stack_meta, readable=True, distance=0.0040):
         True - the wd is 4 mm.
 
     """
-    if round(metadata_params(stack_meta, 'wd', readable=False)[1],4) == distance:
+    if round(metadata_params(data, 'wd', readable=False)[1],4) == distance:
         if readable is False:
             return True
-    if round(metadata_params(stack_meta, 'wd', readable=False)[1],4) != distance:
+    if round(metadata_params(data, 'wd', readable=False)[1],4) != distance:
         if readable is True:
-            print('\t\tWARNING !','\t\t', 'Working distance is \t', metadata_params(stack_meta, 'wd', readable=False)[1]*1000,' mm')
+            print('\t\tWARNING !','\t\t', 'Working distance is \t', metadata_params(data, 'wd', readable=False)[1]*1000,' mm')
         if readable is False:
             return False
 
