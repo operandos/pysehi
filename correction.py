@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 from pyvsnr import VSNR
 import time
 
-test_img_path = r"G:\My Drive\Data\Collaboration\Processed\Loughborough\NMC\622\cathode\221209\BC1\BC1_avg_img.tif"
-img = ps.load_single_file(test_img_path)[0]
+#test_img_path = r"G:\My Drive\Data\Collaboration\Processed\Loughborough\NMC\622\cathode\221209\BC1\BC1_avg_img.tif"
+#img = ps.load_single_file(test_img_path)[0]
 
 def curtains_removal_vsnr(data, maxit=15, theta=2):
     if type(data) is str:
