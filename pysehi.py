@@ -32,7 +32,7 @@ import pathlib
 import pandas as pd
 import collections
 
-def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None, register=True, custom_name=None, overview_img:str=None):
+def process_files(files:str or dict, AC:bool=True, condition_true:list=None, condition_false:list=None, register=True, custom_name=None, colour_thirds=None, overview_img:str=None):
     if type(files) is str:
         files_pl=pathlib.Path(files)
         for part in files_pl.parts:
@@ -511,7 +511,7 @@ def plot_axes(norm=False, x_eV=True):
     if norm == True:
         plt.ylabel('Emission intensity norm. [arb.u.]',weight='bold')
 
-def plot_scalebar(img, length_fraction=0.3, font_size=15, stack_meta=None, metadata=None, pixel_width=None, hfw=None, img_info=None, save_path=None):
+def plot_scalebar(img, length_fraction=0.3, font_size=15, stack_meta=None, metadata=None, pixel_width=None, hfw=None, img_info=None, save_path=None, plot=True):
     plt.imshow(img, cmap="gray")
     plt.axis('off')
     if stack_meta is not None:
@@ -528,12 +528,11 @@ def plot_scalebar(img, length_fraction=0.3, font_size=15, stack_meta=None, metad
     #else:
     #    print('Provide pixel width info')
     #    return
-    scalebar = ScaleBar(dx=pixel_width, length_fraction=0.3, location='lower right', border_pad=0.5, color='w', box_color='k', box_alpha=0.5, font_properties={'size':'15'})
+    scalebar = ScaleBar(dx=pixel_width, length_fraction=0.3, location='lower right', border_pad=0.5, color='w', box_color='k', box_alpha=0.35, font_properties={'size':'15'})
     plt.gca().add_artist(scalebar)
     if save_path is not None:
         plt.savefig(save_path, dpi=400, bbox_inches='tight',pad_inches=0)
-        plt.show()
-    if save_path is None:
+    if plot is True:
         plt.show()
         
 def zpro(stack):
@@ -930,13 +929,13 @@ class data:
         if fin_img == True:
             img = self.stack[-1,:,:]
         if scalebar == True:
-            plot_scalebar(img, stack_meta=self.stack_meta)
+            plot_scalebar(img, stack_meta=self.stack_meta, plot=plot)
         if scalebar == False:
             plt.imshow(img, cmap='gray')
             plt.axis('off')
         if plot is True:
             plt.show()
-    def plot_spec(self, rois=None, groups:dict=None, plot=True, x_eV=True, xlim=[-1,8], pixel_spec:int=None,
+    def plot_spec(self, rois=None, groups:dict or str=None, plot=True, x_eV=True, xlim=[-1,8], pixel_spec:int=None,
                   smooth_width:int=None, savefig=False):
         """
         
@@ -944,9 +943,11 @@ class data:
         Parameters
         ----------
         rois : TYPE, optional
-            DESCRIPTION. The default is None.
+            str or dict from roi_masks function. The default is None.
         groups : dict, optional
-            DESCRIPTION. The default is None.
+            To provide average plot from grouped areas.
+            eg. groups={'PVDF':['1a','1b','1c','1d'],'Gr':['2a','2b','2c','2d'],'CB':['3a','3b','3c']}.
+            The default is None.
         plot : TYPE, optional
             DESCRIPTION. The default is True.
         x_eV : TYPE, optional
@@ -1002,6 +1003,14 @@ class data:
                 r = self.spec(rois, pixel_spec)
             color = cm.rainbow(np.linspace(0,1,len(r)))
             masks=np.empty(self.shape[1:3])
+            if groups is not None:
+                if type(groups) is str and '.json' in groups:
+                    with open(groups) as file:
+                        groups=json.load(file)
+                    file.close()
+                    make_group=False
+                else:
+                    make_group=True
             if type(groups) is dict:
                 groups_df = {}
                 for k in groups:
@@ -1009,10 +1018,10 @@ class data:
             for i, (name,c) in enumerate(zip(r,color)):
                 if not 'spec' in r[name]:
                     r[name]['spec'] = data.spec(self, r[name])[0]['spec']
-                if type(groups) is dict:
-                    for k in groups:
-                        if i+1 in groups[k]:
-                            groups_df[k][i+1] = r[name]['spec']
+                    if type(groups) is dict:
+                        for k in groups:
+                            if name in groups[k]:
+                                groups_df[k][name] = r[name]['spec']
                 if smooth_width is None:
                     y = r[name]['spec']
                 else:
@@ -1068,19 +1077,36 @@ class data:
                     if os.path.exists(save_path) is False:
                         os.makedirs(save_path)
                     plt.savefig(rf'{save_path}{slash}spec.png', dpi=300, transparent=True)
+                    if make_group is True:
+                        with open(rf'{save_path}{slash}groups.json', 'w') as f:
+                            json.dump(groups, f)
+                        f.close()
             if savefig is True:
                 save_path = rf'{self.folder}{slash}ROI'
                 if os.path.exists(save_path) is False:
                     os.makedirs(save_path)
                 plt.savefig(rf'{save_path}{slash}spec.png', dpi=300, transparent=True)
+                if make_group is True:
+                    with open(rf'{save_path}{slash}groups.json', 'w') as f:
+                        json.dump(groups, f)
+                    f.close()
             if plot:
                 plt.show()
-                plt.imshow(rgba)
+                #plt.imshow(self.img_avg(),cmap='gray')
+                self.plot_img(plot=False)
+                plt.imshow(rgba, alpha=0.35)
+                plt.axis('off')
+                for name in r:
+                    if len(r[name]['roi_path']) == 1:
+                        plt.annotate(r[name]['name'], xy=r[name]['roi_path'][0][0], va='top', ha='left',c=[1,1,1], fontsize=8)
+                    else:
+                        for i in r[name]['roi_path']:
+                            plt.annotate(r[name]['name'], xy=r[name]['roi_path'][0][0], va='top', ha='left',c=[1,1,1], fontsize=8)
                 if type(savefig) is str:
                     save_path=savefig
-                    plt.savefig(rf'{save_path}{slash}masks.png', dpi=300, transparent=True)
+                    plt.savefig(rf'{save_path}{slash}masks.png', dpi=300, transparent=True, bbox_inches='tight',pad_inches=0)
                 if savefig is True:
-                    plt.savefig(rf'{save_path}{slash}masks.png', dpi=300, transparent=True)
+                    plt.savefig(rf'{save_path}{slash}masks.png', dpi=300, transparent=True, bbox_inches='tight',pad_inches=0)
     
     def plot_zpro(self, x_eV=True):
         plt.plot(self.eV, zpro(self.stack))
