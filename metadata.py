@@ -11,7 +11,30 @@ import csv
 import os
 import pathlib
 
-def metadata_params(data=None, parameter=None, parameter_false=None,readable=True, write=False):
+def metadata_params(data, parameter=None, parameter_false=None,readable=True, write=False):
+    """
+    
+
+    Parameters
+    ----------
+    data : data object of pysehi module
+    parameter : str or list, optional
+        Default is None to return all parameters.
+        From 'curr','accel','uc','dwell','wd','r','t','x','y','z','hfw','px','py','average',
+        'integrate','interlacing','cntr','brtn'.
+    parameter_false : str or list, optional
+        Exclude these parameters. The default is None.
+    readable : bool, optional
+        DESCRIPTION. The default is True.
+    write : bool, optional
+        Writes the human readable summary in the data folder. The default is False.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    """
     slash = slash_type(data.folder)
     stack_meta = data.stack_meta
     name=rf"{data.date}_{data.name}"
