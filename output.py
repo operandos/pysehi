@@ -123,7 +123,7 @@ def summary_excel(path_to_files, date:int=None, condition_true:list=None, condit
         worksheetSpec.insert_chart(15,4+colNoSpec, chartIntensity)
         workbook.close()
 
-def location_mosaic(path_to_folder, path_to_img_overview=None, condition_false=None,path_to_img_template=None):
+def location_mosaic(path_to_folder, path_to_img_overview=None, condition_true=None, condition_false=None,path_to_img_template=None):
     slash=slash_type(path_to_folder)
     loc_dict = {}
     if path_to_img_overview is not None:
@@ -154,7 +154,7 @@ def location_mosaic(path_to_folder, path_to_img_overview=None, condition_false=N
         img_over_r = transform.rotate(img_over[0:ResY,0:ResX], rot_anticlock, center=[0,0], resize=True)
     
     ### load mosaic regions metadata into dict ###
-    files = ps.list_files(path_to_folder,condition_false=condition_false, load_data=True)
+    files = ps.list_files(path_to_folder,condition_true=condition_true,condition_false=condition_false, load_data=True)
     
     ### add mosaic region properties to loc_dict ###
     paths=np.empty([1,2])
