@@ -232,7 +232,7 @@ def load(folder, AC=True, register=True, calib=None, uint8=False):
             stack = img_as_ubyte(stack)
         dtype_info = np.iinfo(stack.dtype)
         stack_meta_files = glob.glob(rf'{folder}{slash}Metadata{slash}*stack_meta*.json')
-        if len(stack_meta_files)==0 and '_AC' in os.path.split(folder)[1]:
+        if len(stack_meta_files)==0 and '_AC_' in os.path.split(folder)[1]:
             stack_meta_files = glob.glob(rf'{folder.split("_AC")[0]}{slash}Metadata{slash}*stack_meta*.json')
             with open(stack_meta_files[0]) as file:
                 stack_meta = json.load(file)
